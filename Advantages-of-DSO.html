@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" type="text/css" href="https://sunshanlu.github.io/dso_ssl/theme/css/elegant.prod.9e9d5ce754.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="https://sunshanlu.github.io/dso_ssl/theme/css/custom.css" media="screen">
+
+<style>
+    .math.display {
+        display: block;
+        text-align: center;
+        margin: 1em 0;
+    }
+</style>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.0/es5/tex-mml-chtml.js"></script>
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="google-site-verification" content="UpDPegqFb_TnOIJbDp5ud8wVncaUoUB-fJoQyiiAdmg" />        <meta name="msvalidate.01" content="A86784EE624E2187E0AC969B764CE1E1" />        <meta name="author" content="孙善路-github" />
+
+        <meta name="description" content="介绍 DSO 即 Direct Sparse Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比 …
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="vSLAM, DSO, Robot, DSO, " />
+
+<meta property="og:title" content="DSO的算法优势 "/>
+<meta property="og:url" content="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO" />
+<meta property="og:description" content="介绍 DSO 即 Direct Sparse Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比 …" />
+<meta property="og:site_name" content="SSL的SLAM系列 - DSO" />
+<meta property="og:article:author" content="孙善路-github" />
+<meta property="og:article:published_time" content="2025-01-02T00:00:00+08:00" />
+<meta name="twitter:title" content="DSO的算法优势 ">
+<meta name="twitter:description" content="介绍 DSO 即 Direct Sparse Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比 …">
+
+        <title>DSO的算法优势  · SSL的SLAM系列 - DSO
+</title>
+        <link rel="shortcut icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-152x152.png" type="image/png" />
+        <link rel="apple-touch-icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon.png"  type="image/png" />
+        <link rel="apple-touch-icon" sizes="57x57" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-57x57.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="72x72" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-72x72.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="76x76" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-76x76.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="114x114" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-114x114.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="120x120" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-120x120.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="144x144" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-144x144.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-152x152.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-180x180.png" type="image/png" />
+        <link href="https://sunshanlu.github.io/dso_ssl/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="SSL的SLAM系列 - DSO - Full Atom Feed" />
+
+
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://sunshanlu.github.io/dso_ssl/"><span class=site-name>SSL的SLAM系列 - DSO</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://sunshanlu.github.io/dso_ssl
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://sunshanlu.github.io/dso_ssl/categories">Categories</a></li>
+                                <li ><a href="https://sunshanlu.github.io/dso_ssl/tags">Tags</a></li>
+                                <li ><a href="https://sunshanlu.github.io/dso_ssl/archives">Archives</a></li>
+                                <li><form class="navbar-search" action="https://sunshanlu.github.io/dso_ssl/search" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+    <div class="row-fluid">
+        <header class="page-header span10 offset2">
+            <h1>
+                <a href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO">
+                    DSO的算法优势
+                </a>
+            </h1>
+        </header>
+    </div>
+
+    <div class="row-fluid">
+            <div class="span8 offset2 article-content">
+                
+                <h2 id="介绍">介绍</h2>
+<p><span class="caps">DSO</span> 即 Direct Sparse&nbsp;Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比较多，代码的实现上更是接近底层（甚至底层到优化过程、字节对齐都是自己实现）。因此我认为DSO是一个非常值得学习和借鉴的vSLAM直接法。</p>
+<p>在这本篇中，我打算着重解释什么是Direct，什么是Indirect；什么是Sparse，什么是Dense。它们之间到底有什么区别，具体的优劣势又在哪？</p>
+<h2 id="直接法-和-非直接法">1. 直接法 和&nbsp;非直接法</h2>
+<p>在SLAM十四讲中的第8章（视觉里程计2）中，提到了直接法的概念和基本原理，重点在于像素级别的灰度不变性，通过灰度不变假设构建优化模型。这里与非直接法，通过构建重投影误差有本质区别。</p>
+<h3 id="直接法">1.1&nbsp;直接法</h3>
+<p><span class="math display"><em>r</em><sub><em>k</em></sub> = <em>I</em><sub><em>j</em></sub>[<em>p</em><sub><em>j</em></sub>] − <em>I</em><sub><em>i</em></sub>[<em>p</em><sub><em>i</em></sub>]</span></p>
+<p><span class="math display">$$
+p_j = \pi(T_{ji} * \frac{\pi^{-1}(p_i)}{d_{pi}})&nbsp;$$</span></p>
+<p>正如上面的公式描述的一样，残差应该是ij两帧之间的像素差值。根据灰度不变假设，当<span class="math inline"><em>p</em><sub><em>i</em></sub></span>和<span class="math inline"><em>p</em><sub><em>j</em></sub></span>之间描述的是同一个3d空间中的点时，<span class="math inline"><em>r</em><sub><em>k</em></sub></span>最小，应该为0。为了重点突出灰度不变的假设，并没有考虑仅用一个点投影的非鲁棒性（实际情况下，需要考虑一个patch——像素块的灰度不变假设，这样更鲁邦一些）。</p>
+<p><span class="math display">$$
+\frac{\partial r_k}{\partial \delta \xi_{ji}} = \frac{\partial
+r_k}{\partial I_j} * \frac{\partial I_j}{\partial p_j} * \frac{\partial
+p_j}{\partial \delta \xi_{ji}}&nbsp;$$</span></p>
+<p><span class="math display">$$
+\frac{\partial r_k}{\partial d_{pi}} = \frac{\partial r_k}{\partial I_j}
+* \frac{\partial I_j}{\partial p_j} * \frac{\partial p_j}{\partial
+d_{pi}}&nbsp;$$</span></p>
+<p>根据链式法则，可以看到残差对位姿的雅可比矩阵与<span class="math inline"><em>I</em><sub><em>j</em></sub></span>帧的像素梯度有关系。然而由于图像的非凸性比较明显，在经验上，图像的梯度仅能表示2个像素范围内的灰度变化。因此当使用直接法对图像进行跟踪时，需要较好的初始值，并且当跟踪丢失后，就很难进行重定位了。</p>
+<p>但是由于直接法构建的是灰度之间的差异，而不是特征点的计算。因此直接法在算法运行速度上，要比非直接法快得多。</p>
+<h3 id="非直接法">1.2&nbsp;非直接法</h3>
+<p>我最先能想到的非直法就是
+<span class="caps">ORB</span>-SLAM系列。经典的特征点匹配，通过BA构建重投影误差。针对非直接法来讲，像素的灰度变化并不会导致非直接法的强烈波动。原因在于，非直接法的特征点是由关键点和描述子两部分组成，具有相当强的稳定性。</p>
+<p>非直接法之所以被称为非直接，是因为非直接法需要将得到的数据进行初步的加工处理，而不是直接使用传感器得到的结果。针对视觉SLAM来讲，传感器得到的数据就是像素点的灰度，而非直接法需要根据灰度和像素位置两方面的信息进行某种方式的计算，从而提取出特征点。而这部分计算任务往往是非直接法中最耗时的部分。</p>
+<p>由于非直接法的特征点计算总是和像素梯度强相关，当图像中存在弱梯度时，特征点的提取可能失败，并且图像中的梯度越弱，提取出的特征点的鲁棒性和稳定性相对较差。因此特征点法对图像的梯度较敏感。</p>
+<h3 id="优缺点汇总">1.3&nbsp;优缺点汇总</h3>
+<p>根据上面的分析，直接法的优劣势如下：</p>
+<ol type="1">
+<li>直接法的速度更快，因为不需要计算特征点。</li>
+<li>直接法对图像的梯度不是那么敏感。</li>
+<li>直接法在优化过程中会涉及到像素梯度，因此跟踪失败后，重定位相对困难。</li>
+</ol>
+<p>除此之外，要是以回环闭合的角度去讨论的话，非直接法可能更具优势，因为目前视觉SLAM中比较常用的回环检测方法都是基于词袋的。而词袋方法的直接依据往往都是特征点的描述子。</p>
+<h2 id="稀疏-和-稠密">2. 稀疏 和&nbsp;稠密</h2>
+<p>在视觉SLAM中，稀疏和稠密主要是用来描述建图过程中是否会考虑点与点之间的关系。在视觉SLAM中，稀疏的方法往往占据主流，因为以优化的角度去讨论，稀疏方法往往不考虑点与点之间的关系，反映在优化的H矩阵中，表现为稀疏的矩阵，或者说引用视觉SLAM十四讲的内容，应该为一个箭头矩阵。只有这种稀疏的箭头矩阵，才能使用Schur消元的方式去加速事实求解。</p>
+<p>当然，目前也有半稠密的视觉SLAM方法，比如说LSD-<span class="caps">SLAM</span>，LSD的方法考虑了点与点之间的连通性关系，但是LSD并没有使用所有的像素点来构建地图，因此在学术上称这种方法为半稠密。LSD使用了GPU，来实时的解一个稠密的H矩阵。</p>
+<p>考虑像素中的所有点，并且考虑点与点之间的关系问题，在SFM问题中比较常见，即3D重建任务（从移动中恢复结构）。这种问题往往都是离线，使用多GPU的方式求解，重点在于恢复3D空间结构，而不是实时的给出相机位姿。</p>
+
+
+                 
+ 
+                    <p id="post-share-links">
+    喜欢这篇文章吗？喜欢就分享吧:
+      <a href="https://twitter.com/intent/tweet?text=DSO%E7%9A%84%E7%AE%97%E6%B3%95%E4%BC%98%E5%8A%BF&url=https%3A//sunshanlu.github.io/dso_ssl/Advantages-of-DSO&hashtags=vslam,dso,robot" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//sunshanlu.github.io/dso_ssl/Advantages-of-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=DSO%E7%9A%84%E7%AE%97%E6%B3%95%E4%BC%98%E5%8A%BF&amp;body=https%3A//sunshanlu.github.io/dso_ssl/Advantages-of-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+                    <hr />
+    <div class="author-blurb">
+        <a href="https://github.com/sunshanlu" target="_blank" rel="nofollow noopener noreferrer">
+            <img src=https://avatars.githubusercontent.com/u/78467062 alt="孙善路-github Avatar" title="孙善路-github">
+            <span class="author-name">孙善路-github</span>
+        </a>
+        对SLAM和DL感兴趣的理工男
+    </div>
+    <div class="author-blurb">
+        <a href="https://space.bilibili.com/489032586" target="_blank" rel="nofollow noopener noreferrer">
+            <img src=/images/avatars/sunshanlu.png alt="孙善路-bilibili Avatar" title="孙善路-bilibili">
+            <span class="author-name">孙善路-bilibili</span>
+        </a>
+        对SLAM和DL感兴趣的理工男
+    </div>
+
+                
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message">有什么问题吗，有任何问题欢迎你在下面评论留言或者邮件联系我！ </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+
+                        <script src="https://utteranc.es/client.js"
+        data-repo="sunshanlu/dso_ssl"
+        data-issue-term="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO"
+        data-label="✨💬✨"
+        data-theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+                <hr />
+<section>
+    <h2>Keep Reading</h2>
+<ul class="related-posts-list">
+<li><a href="https://sunshanlu.github.io/dso_ssl/Math-Test" title="公式测试">公式测试</a></li>
+</ul>
+<hr />
+</section>
+                <aside>
+                    <nav>
+                        <ul class="articles-timeline">
+                            <li class="previous-article">« <a href="https://sunshanlu.github.io/dso_ssl/Math-Test"
+                                    title="Previous: 公式测试">公式测试</a></li>
+                        </ul>
+                    </nav>
+                </aside>
+            </div>
+            <section id="article-sidebar" class="span2">
+                <h4>Published</h4>
+                <time itemprop="dateCreated" datetime="2025-01-02T00:00:00+08:00">1月 02, 2025</time>
+                <h4>Category</h4>
+                <a class="category-link" href="https://sunshanlu.github.io/dso_ssl/categories#dso-ref">DSO</a>
+                <h4>Tags</h4>
+                <ul class="list-of-tags tags-in-article">
+                    <li><a href="https://sunshanlu.github.io/dso_ssl/tags#dso-ref">DSO
+                            <span class="superscript">2</span>
+</a></li>
+                    <li><a href="https://sunshanlu.github.io/dso_ssl/tags#robot-ref">Robot
+                            <span class="superscript">2</span>
+</a></li>
+                    <li><a href="https://sunshanlu.github.io/dso_ssl/tags#vslam-ref">vSLAM
+                            <span class="superscript">2</span>
+</a></li>
+                </ul>
+<h4>Contact Me</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/sunshanlu" title="Github 页面" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+    <a href="mailto:ssl2001@126.com" title="Email Me" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="Mail" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#328cff"/><path d="m250 186c-46 0-69 35-69 74 0 44 29 72 68 72 43 0 73-32 73-75 0-44-34-71-72-71zm-1-37c30 0 57 13 77 33 0-22 35-22 35 1v150c-1 10 10 16 16 9 25-25 54-128-14-187-64-56-149-47-195-15-48 33-79 107-49 175 33 76 126 99 182 76 28-12 41 26 12 39-45 19-168 17-225-82-38-68-36-185 67-248 78-46 182-33 244 32 66 69 62 197-2 246-28 23-71 1-71-32v-11c-20 20-47 32-77 32-57 0-108-51-108-108 0-58 51-110 108-110" fill="#fff"/></svg>
+    </a>
+    <a href="/feeds/all.atom.xml" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="RSS" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#f80"/><circle cx="145" cy="367" r="35" fill="#fff"/><path fill="none" stroke="#fff" stroke-width="60" d="M109 241c89 0 162 73 162 162M109 127c152 0 276 124 276 276"/></svg>
+    </a>
+</div>
+                
+
+
+
+
+
+                
+
+
+
+
+
+            </section>
+        </div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        Content licensed under <a rel="license nofollow noopener noreferrer"
+    href="http://creativecommons.org/licenses/by/4.0/" target="_blank">
+    Creative Commons Attribution 4.0 International License</a>.
+    </div>
+
+    <div>
+        <span class="site-name">SSL的SLAM系列 - DSO</span> - 最好的DSO解析系列
+    </div>
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+        Hosted on:
+        <a href=https://www.github.com/ target="_blank" rel="nofollow noopener noreferrer">
+            Github
+        </a>
+    </div>
+</footer>        <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://sunshanlu.github.io/dso_ssl/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+<script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
