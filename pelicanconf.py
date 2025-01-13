@@ -1,58 +1,169 @@
-# pelicanconf.py
+import os
 
-# 网站作者的名称
-AUTHOR = "ssl"
-
-# 网站的名称或标题
-SITENAME = "SSL的SLAM系列之DSO"
-
-# 网站的根 URL。在开发阶段通常留空，但在生产环境中应设置为实际的域名
+AUTHOR = "孙善路"
+SITENAME = "SSL的SLAM系列 - DSO"
+SITESUBTITLE = "最好的DSO解析系列"
 SITEURL = ""
 
-# 包含内容文件（如 Markdown 文件）的目录路径
 PATH = "content"
 
-# 网站的时间区域设置。用于正确显示日期和时间
-TIMEZONE = "Asia/Shanghai"  # 建议使用标准的时区名称
+# Regional Settings
+TIMEZONE = "Asia/Shanghai"
+DATE_FORMATS = {"en": "%b %d, %Y"}
 
-# 网站的默认语言代码
-DEFAULT_LANG = "zh-cn"
+DEFAULT_LANG = "en"
 
-# Feed generation is usually not desired when developing
-FEED_ALL_ATOM = None
-CATEGORY_FEED_ATOM = None
-TRANSLATION_FEED_ATOM = None
-AUTHOR_FEED_ATOM = None
-AUTHOR_FEED_RSS = None
+# Plugins and extensions
+MARKDOWN = {
+    "extension_configs": {
+        "markdown.extensions.admonition": {},
+        "markdown.extensions.codehilite": {"css_class": "highlight"},
+        "markdown.extensions.extra": {},
+        "markdown.extensions.meta": {},
+        "markdown.extensions.toc": {},
+    }
+}
 
-# 用于网站和其他资源的链接
-LINKS = (("Pelican", "https://getpelican.com/"), ("Python.org", "https://www.python.org/"), ("Jinja2", "https://palletsprojects.com/p/jinja/"))
+PLUGIN_PATHS = ["plugins"]
+PLUGINS = [
+    "extract_toc",
+    "tipue_search",
+    "siteurl_replacer",
+    "pelican.plugins.liquid_tags.img",
+    "pelican.plugins.liquid_tags.include_code",
+    "pelican.plugins.neighbors",
+    "pelican.plugins.related_posts",
+    "pelican.plugins.series",
+    "pelican.plugins.share_post",
+    "pelican.plugins.sitemap",
+]
 
-# 用于填写社交主页的链接
-SOCIAL = (
-    ("BiliBili", "https://space.bilibili.com/489032586"),
-    ("GitHub", "https://github.com/sunshanlu"),
-)
+# 用于配置站点地图，方便搜索引擎的内容抓取
+SITEMAP = {
+    "format": "xml",
+    "priorities": {"articles": 0.5, "indexes": 0.5, "pages": 0.5},
+    "changefreqs": {"articles": "monthly", "indexes": "daily", "pages": "monthly"},
+}
 
-# 每页显示的文章数量。设置为 False 表示不分页
+# Appearance
+THEME = "elegant"
+TYPOGRIFY = True
 DEFAULT_PAGINATION = False
 
-# Uncomment following line if you want document-relative URLs when developing
-# RELATIVE_URLS = True
+# Defaults
+DEFAULT_CATEGORY = "DSO"
+USE_FOLDER_AS_CATEGORY = False
+ARTICLE_URL = "{slug}"
+PAGE_URL = "{slug}"
+PAGE_SAVE_AS = "{slug}.html"
+TAGS_URL = "tags"
+CATEGORIES_URL = "categories"
+ARCHIVES_URL = "archives"
+SEARCH_URL = "search"
 
-# 指定使用的主题名称或路径
-THEME = "elegant"
+# Feeds
+AUTHOR_FEED_ATOM = None
+AUTHOR_FEED_RSS = None
+CATEGORY_FEED_ATOM = None
+CATEGORY_FEED_RSS = None
 
-# 配置插件信息
-PLUGIN_PATHS = ["plugins"]
-# PLUGINS = ["merge_plugin", "pelican.plugins.render_math", "pelican.plugins.search"]
-PLUGINS = ["pelican.plugins.render_math", "pelican.plugins.search"]
+# Social
+SOCIAL = (
+    ("Github", "https://github.com/sunshanlu", "Github 页面"),
+    ("Email", "ssl2001@126.com", "Email Me"),
+    ("RSS", SITEURL + "/feeds/all.atom.xml"),
+)
 
-# ======================= elegant 主题配置 =======================
+# Elegant Themes
+STATIC_PATHS = ["theme/images", "images", "code"]
+EXTRA_PATH_METADATA = dict()
 
-# 启用图标
+
+if os.environ.get("CONTEXT") == "production":
+    STATIC_PATHS.append("extra/robots.txt")
+    EXTRA_PATH_METADATA["extra/robots.txt"] = {"path": "robots.txt"}
+else:
+    STATIC_PATHS.append("extra/robots_deny.txt")
+    EXTRA_PATH_METADATA["extra/robots_deny.txt"] = {"path": "robots.txt"}
+
+DIRECT_TEMPLATES = ["index", "tags", "categories", "archives", "search", "404"]
+TAG_SAVE_AS = ""
+AUTHOR_SAVE_AS = ""
+CATEGORY_SAVE_AS = ""
 USE_SHORTCUT_ICONS = True
-STATIC_PATHS = ["theme/images", "images"]
 
-# 搜索配置
-STORK_INPUT_OPTIONS = {"base_directory": PATH}
+# Elegant Labels
+SOCIAL_PROFILE_LABEL = "Contact Me"
+RELATED_POSTS_LABEL = "Keep Reading"
+SHARE_POST_INTRO = "喜欢这篇文章吗？喜欢就分享吧:"
+COMMENTS_INTRO = "有什么问题吗，有任何问题欢迎你在下面评论留言或者邮件联系我！"
+
+# Legal
+SITE_LICENSE = """Content licensed under <a rel="license nofollow noopener noreferrer"
+    href="http://creativecommons.org/licenses/by/4.0/" target="_blank">
+    Creative Commons Attribution 4.0 International License</a>."""
+HOSTED_ON = {"name": "Github", "url": "https://www.github.com/"}
+
+# Search Engine Optimization
+SITE_DESCRIPTION = "SSL的SLAM系列 - DSO解析"
+
+# Share links at bottom of articles
+# Supported: twitter, facebook, hacker-news, reddit, linkedin, email
+SHARE_LINKS = [("twitter", "Twitter"), ("facebook", "Facebook"), ("email", "Email")]
+
+# Landing Page
+PROJECTS_TITLE = "相关项目"
+PROJECTS = [
+    {
+        "name": "Pelican",
+        "url": "https://getpelican.com/",
+        "description": "网站由Pelican框架生成。",
+    },
+    {
+        "name": "Elegant",
+        "url": "https://github.com/Pelican-Elegant/elegant",
+        "description": "网站使用的Pelican主题。",
+    },
+    {
+        "name": "DSO_SSL",
+        "url": "https://github.com/sunshanlu/dso_ssl",
+        "description": "SSL重写DSO的仓库地址。",
+    },
+    {
+        "name": "Github-SSL",
+        "url": "https://github.com/sunshanlu",
+        "description": "SSL的Github主页，看看是否有你感兴趣的项目呢？",
+    },
+]
+
+LANDING_PAGE_TITLE = "DSO – vSLAM直接法的神，SSL的DSO解析"
+
+AUTHORS = {
+    "孙善路-github": {
+        "url": "https://github.com/sunshanlu",
+        "blurb": "对SLAM和DL感兴趣的理工男",
+        "avatar": "https://avatars.githubusercontent.com/u/78467062",
+    },
+    "孙善路-bilibili": {
+        "url": "https://space.bilibili.com/489032586",
+        "blurb": "对SLAM和DL感兴趣的理工男",
+        "avatar": "/images/avatars/sunshanlu.png",
+    },
+}
+
+
+# UTTERANCES配置
+UTTERANCES_REPO = "sunshanlu/dso_ssl"
+UTTERANCES_THEME = "github-light"
+UTTERANCES_LABEL = "✨💬✨"
+
+# SEO配置
+CLAIM_BING = "A86784EE624E2187E0AC969B764CE1E1"
+CLAIM_GOOGLE = "UpDPegqFb_TnOIJbDp5ud8wVncaUoUB-fJoQyiiAdmg"
+
+# 启用 Jinja2 支持
+JINJA_ENVIRONMENT = {
+    'extensions': [],
+    'trim_blocks': True,
+    'lstrip_blocks': True,
+}
