@@ -1,40 +1,252 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/dso.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-02T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO的算法优势</title><link href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO" rel="alternate"></link><published>2025-01-02T00:00:00+08:00</published><updated>2025-01-02T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-02:/dso_ssl/Advantages-of-DSO</id><summary type="html">&lt;h2 id="介绍"&gt;介绍&lt;/h2&gt;
-&lt;p&gt;&lt;span class="caps"&gt;DSO&lt;/span&gt; 即 Direct Sparse&amp;nbsp;Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比 …&lt;/p&gt;</summary><content type="html">&lt;h2 id="介绍"&gt;介绍&lt;/h2&gt;
-&lt;p&gt;&lt;span class="caps"&gt;DSO&lt;/span&gt; 即 Direct Sparse&amp;nbsp;Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比较多，代码的实现上更是接近底层（甚至底层到优化过程、字节对齐都是自己实现）。因此我认为DSO是一个非常值得学习和借鉴的vSLAM直接法。&lt;/p&gt;
+<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/dso.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-09T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的去畸变操作</title><link href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" rel="alternate"></link><published>2025-01-09T00:00:00+08:00</published><updated>2025-01-09T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-09:/dso_ssl/De-distortion-in-DSO</id><summary type="html">
+&lt;h2 id="1"&gt;1. 像素去畸变&lt;/h2&gt;
+&lt;h3 id="11"&gt;1.1 畸变模型&lt;/h3&gt;
+&lt;p&gt;DSO中引入了不同的畸变模型，来解决不同相机的像素畸变问题，除了我们在SLAM十四讲里面熟知的&lt;code&gt;RadTan&lt;/code&gt;畸变模型外，还有&lt;code&gt;FOV&lt;/code&gt;和&lt;code&gt;KannalaBrandt&lt;/code&gt;畸变模型。不同 …&lt;/p&gt;</summary><content type="html">
+&lt;h2 id="1"&gt;1. 像素去畸变&lt;/h2&gt;
+&lt;h3 id="11"&gt;1.1 畸变模型&lt;/h3&gt;
+&lt;p&gt;DSO中引入了不同的畸变模型，来解决不同相机的像素畸变问题，除了我们在SLAM十四讲里面熟知的&lt;code&gt;RadTan&lt;/code&gt;畸变模型外，还有&lt;code&gt;FOV&lt;/code&gt;和&lt;code&gt;KannalaBrandt&lt;/code&gt;畸变模型。不同的像素畸变模型的公式由下面的公式给出：&lt;/p&gt;
+&lt;p&gt;首先是我们熟知的&lt;code&gt;RadTan&lt;/code&gt;径向切向畸变模型，可以根据畸变程度选择不同参数数量进行配置计算，常用的有三参数法（&lt;span class="math"&gt;\(k_1\)&lt;/span&gt;,&lt;span class="math"&gt;\(p_1\)&lt;/span&gt;,&lt;span class="math"&gt;\(p_2\)&lt;/span&gt;）和五参数法（&lt;span class="math"&gt;\(k_1\)&lt;/span&gt;,&lt;span class="math"&gt;\(k_2\)&lt;/span&gt;,&lt;span class="math"&gt;\(k_3\)&lt;/span&gt;,&lt;span class="math"&gt;\(p_1\)&lt;/span&gt;,&lt;span class="math"&gt;\(p_2\)&lt;/span&gt;）：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\left\{\begin{matrix}
+ x_{distorted} = x(1+k_1r^2+k_2r^4+k_3r^6) + 2p_1xy+p_2(r^2+2x^2)\\
+ y_{distorted} = y(1+k_1r^2+k_2r^4+k_3r^6) + 2p_2xy+p_1(r^2+2y^2)\\
+ r = \sqrt{x^2+y^2}
+\end{matrix}\right.
+$$&lt;/div&gt;
+&lt;p&gt;然后是&lt;code&gt;FOV&lt;/code&gt;视野畸变模型，仅有一个参数&lt;span class="math"&gt;\(\omega\)&lt;/span&gt;：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\left\{\begin{matrix} 
+ x_{distorted} =\frac{r_{d}}{r}\cdot x\\ 
+ y_{distorted} =\frac{r_{d}}{r}\cdot y\\
+ r_{d} =\frac{1}{\omega }arctan(2\cdot r\cdot tan(\frac{\omega }{2}))\\
+ r = \sqrt{x^2 + y^2}\\
+\end{matrix}\right.
+$$&lt;/div&gt;
+&lt;p&gt;最后是&lt;code&gt;KannalaBrandt&lt;/code&gt;光度畸变模型，有四个参数&lt;span class="math"&gt;\(k_1\)&lt;/span&gt;,&lt;span class="math"&gt;\(k_2\)&lt;/span&gt;,&lt;span class="math"&gt;\(k_3\)&lt;/span&gt;,&lt;span class="math"&gt;\(k_4\)&lt;/span&gt;：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\left\{\begin{matrix} 
+ x_{distorted} = \frac{\theta _{d}}{r}\cdot x_{c}\\ 
+ y_{distorted} = \frac{\theta _{d}}{r}\cdot y_{c}\\
+ \theta = atan(r)\\
+ \theta_{d}=\theta(1+k_1\theta^2+k_2\theta^4+k_3\theta^6+k_4\theta^8)
+\end{matrix}\right.
+$$&lt;/div&gt;
+&lt;h3 id="12-dsopinhole"&gt;1.2 DSO中畸变模型转Pinhole逻辑&lt;/h3&gt;
+&lt;p&gt;当然，这里的畸变模型并不是我想向大家进行解析的重点，&lt;code&gt;DSO&lt;/code&gt;将这种像素畸变模型向小孔成像模型&lt;code&gt;Pinhole&lt;/code&gt;进行了转换，而这个转换的逻辑，是我想给大家分享的重点！这里三种不同的畸变模型，我以&lt;span class="math"&gt;\(d(p,K)\)&lt;/span&gt;来进行表示，这里的&lt;span class="math"&gt;\(p\)&lt;/span&gt;表示归一化坐标系下的某个实际点，而&lt;span class="math"&gt;\(K\)&lt;/span&gt;表示畸变模型的参数。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img alt="distorted image" src="https://sunshanlu.github.io/dso_ssl/images/distorted.png" width="40%"/&gt;
+&lt;img alt="undistorted image" src="https://sunshanlu.github.io/dso_ssl/images/undistorted.png" width="40%"/&gt;
+&lt;/div&gt;
+&lt;ol&gt;
+&lt;li&gt;在归一化坐标系上，划定一块足够大的区域&lt;span class="math"&gt;\(S\)&lt;/span&gt;，在&lt;code&gt;DSO&lt;/code&gt;的源码里面是&lt;span class="math"&gt;\(x\in[-5,+5],y\in[-5,+5]\)&lt;/span&gt;，试图通过在&lt;span class="math"&gt;\(x=0\)&lt;/span&gt;和&lt;span class="math"&gt;\(y=0\)&lt;/span&gt;的区域线段上，找到一组极限位置&lt;span class="math"&gt;\(X_{min}\)&lt;/span&gt;、&lt;span class="math"&gt;\(X_{max}\)&lt;/span&gt;、&lt;span class="math"&gt;\(Y_{min}\)&lt;/span&gt;和&lt;span class="math"&gt;\(Y_{max}\)&lt;/span&gt;，作为初始的粗略归一化区域（这个区域包含足够多的像素信息）。&lt;/li&gt;
+&lt;li&gt;在&lt;code&gt;X=0&lt;/code&gt;轴方向上，以y划分为10万个刻度点，使用这些点向畸变坐标系进行投影，试图找到一个&lt;span class="math"&gt;\(Y_{min}\)&lt;/span&gt;和&lt;span class="math"&gt;\(Y_{max}\)&lt;/span&gt;，对应的这两个点的像素投影点都应在畸变像素坐标系内。&lt;/li&gt;
+&lt;li&gt;在&lt;code&gt;Y=0&lt;/code&gt;轴方向上，使用上面一样的策略，寻找&lt;span class="math"&gt;\(X_{min}\)&lt;/span&gt;和&lt;span class="math"&gt;\(X_{max}\)&lt;/span&gt;。&lt;/li&gt;
+&lt;li&gt;在获得的极限位置轴上，取点（点的个数可以是畸变图像的宽度或者高度，以保证足够的分辨率），进行畸变和投影获得畸变像素坐标，判断像素坐标是否在图像范围内。&lt;/li&gt;
+&lt;li&gt;如果所有点都在像素图像范围内，则认为这个这个轴的位置是合理的。&lt;/li&gt;
+&lt;li&gt;如果存在点不在像素图像范围内，则需要将这个轴的位置进行向内移动，源码中是&lt;code&gt;*0.995&lt;/code&gt;，以此来达到向内移动的效果。&lt;/li&gt;
+&lt;li&gt;注意，当X轴和Y轴部分都需要向内移动时，源码中为了防止额外的像素损失，仅尺寸较大的那一轴进行移动。&lt;/li&gt;
+&lt;li&gt;总的来说，&lt;code&gt;DSO&lt;/code&gt;在实现畸变模型到纯小孔成像模型之间转换的时候，使用了两步法实现，首先，通过&lt;code&gt;X=0&lt;/code&gt;和&lt;code&gt;Y=0&lt;/code&gt;两个轴上的点确定一个较粗粒度的归一化区域，因为使用的是归一化中心点，因此这个区域肯定可以覆盖绝大部分的可视像素信息。然后再不断的投影四个极限轴上的点来实现轴的缩放，因此来获取一个精确的归一化区域。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;使用上述说明的方式，可以获得一个归一化区域，这个区域内的所有点向畸变像素坐标系投影的结果都会在畸变图像范围内。在给定目标图像的宽度&lt;code&gt;w&lt;/code&gt;和高度&lt;code&gt;h&lt;/code&gt;后，可以计算获得&lt;code&gt;pinhole&lt;/code&gt;条件下的内参矩阵&lt;code&gt;K&lt;/code&gt;:&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\left\{\begin{matrix}
+    f_xX_{min} + c_x = 0\\
+    f_yY_{min} + c_y = 0\\
+    f_xX_{max} + c_x = w\\
+    f_yY_{max} + c_y = h 
+\end{matrix}
+\right.
+$$&lt;/div&gt;
+&lt;p&gt;最终可以得到：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+K = \begin{bmatrix}
+    \frac{w}{X_{max}-X_{min}} &amp;amp; 0 &amp;amp; -\frac{wX_{min}}{X_{max}-X_{min}}\\
+    0 &amp;amp; \frac{h}{Y_{max}-Y_{min}} &amp;amp; -\frac{hY_{min}}{Y_{max}-Y_{min}}\\
+    0 &amp;amp; 0 &amp;amp; 1
+\end{bmatrix}
+$$&lt;/div&gt;
+&lt;h2 id="2"&gt;2. 光度去畸变&lt;/h2&gt;
+&lt;h3 id="21"&gt;2.1 光度畸变模型&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的作者考虑了相机的成像过程，针对形成漫反射的某个点&lt;code&gt;p&lt;/code&gt;来讲,它会产生辐射&lt;span class="math"&gt;\(B_i(x)\)&lt;/span&gt;，相机的感光器件会接收到这个这个点的辐射&lt;span class="math"&gt;\(B_i(x)\)&lt;/span&gt;。但是由于辐射在相机的透镜中会发生一些扭曲，造成相机成像的渐晕现象（中间部分接收的辐射较高，而周围的较低），这种渐晕会被建模称&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;，一般会用一张和成像尺寸相同的灰度图来表示，下面是&lt;code&gt;TUM/sequence_29&lt;/code&gt;数据集中的渐晕图表示。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img alt="渐晕表示" src="https://sunshanlu.github.io/dso_ssl/images/vignette.png" width="60%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;相机的感光器件在一定的曝光时间&lt;span class="math"&gt;\(t_i\)&lt;/span&gt;内（很短的一段时间内），对辐射进行积分，假设在曝光时间内的辐射恒定那么感光器件获取到的能量值可以通过&lt;span class="math"&gt;\(IR_{acc}(x)=t_iV(x)B_i(x)\)&lt;/span&gt;进行表示。&lt;/p&gt;
+&lt;p&gt;除此之外，相机并不会直接将能量作为像素值的输出，而是会经过相机的非线性响应函数&lt;span class="math"&gt;\(G\)&lt;/span&gt;进行转换，&lt;span class="math"&gt;\(I_i(x)=G(t_iV(x)B_i(x))\)&lt;/span&gt;，而&lt;span class="math"&gt;\(G^{-1}\)&lt;/span&gt;一般通过&lt;strong&gt;单调递增&lt;/strong&gt;的&lt;a href="https://sunshanlu.github.io/dso_ssl/files/pcalib.txt"&gt;256个数值&lt;/a&gt;进行表示，即索引部分为像素值，而值部分对应的是某个适应的能量值。&lt;/p&gt;
+&lt;p&gt;因为&lt;code&gt;DSO&lt;/code&gt;这种直接法会直接跟像素值打交道，为了避免渐晕&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;和曝光时间&lt;span class="math"&gt;\(G\)&lt;/span&gt;响应函数的干扰，&lt;code&gt;DSO&lt;/code&gt;在这里进行了光度矫正处理，矫正处理的结果为：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+I'_i(x)=t_iB_i(x)=\frac{G^{-1}(I_i(x))}{V(x)}
+$$&lt;/div&gt;
+&lt;p&gt;通过深度思考发现，如果光照恒定的条件下，不同点产生的辐射值&lt;span class="math"&gt;\(B_i(x)\)&lt;/span&gt;是相同的，但是这里的光度矫正为什么还会存在曝光时间&lt;span class="math"&gt;\(t_i\)&lt;/span&gt;的影响呢？&lt;/p&gt;
+&lt;p&gt;我认为，这种疑问考虑是完全正确的，这里的光度矫正确实没有去掉曝光时间&lt;span class="math"&gt;\(t_i\)&lt;/span&gt;的影响，但是曝光时间这部分的影响是在优化的能量函数中进行考虑的。能量函数的建模部分我会单独进行讲解，这里只需要记住&lt;code&gt;DSO&lt;/code&gt;会在能量函数建模中考虑曝光时间的影响即可。&lt;/p&gt;
+&lt;h3 id="22"&gt;2.2 无光度参数的解决方案&lt;/h3&gt;
+&lt;p&gt;在2.1部分，光度畸变模型中，要求需要对相机的光度参数部分进行标定，这会涉及到渐晕&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;的标定、非线性响应函数&lt;span class="math"&gt;\(G(I)\)&lt;/span&gt;的标定，以及曝光时间的获取。&lt;/p&gt;
+&lt;p&gt;然而在实际的数据集中，这些参数绝大部分的数据集是没有的，因此&lt;code&gt;DSO&lt;/code&gt;提供了一种无光度参数的解决方案，即使用仿射函数的方式实现模拟光度校正，并且&lt;strong&gt;认定曝光时间&lt;span class="math"&gt;\(t_i\)&lt;/span&gt;为1&lt;/strong&gt;，即：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+I'_i(x) = e^{a_i}I_i(x) - b_i
+$$&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的论文里面还这样描述：这里乘法因子使用&lt;span class="math"&gt;\(e^{a_i}\)&lt;/span&gt;而不是直接使用&lt;span class="math"&gt;\(a_i\)&lt;/span&gt;的原因是，使用指数函数，既可以防止其乘法项变为负数，又可以避免因乘法漂移而产生的数值问题。&lt;/p&gt;
+&lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry><entry><title>DSO的算法优势</title><link href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO" rel="alternate"></link><published>2025-01-02T00:00:00+08:00</published><updated>2025-01-02T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-02:/dso_ssl/Advantages-of-DSO</id><summary type="html">
+&lt;h2 id="_1"&gt;介绍&lt;/h2&gt;
+&lt;p&gt;&lt;span class="caps"&gt;DSO&lt;/span&gt; 即 Direct Sparse Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比较多，代码的实现上更是接近底层（甚至底层到 …&lt;/p&gt;</summary><content type="html">
+&lt;h2 id="_1"&gt;介绍&lt;/h2&gt;
+&lt;p&gt;&lt;span class="caps"&gt;DSO&lt;/span&gt; 即 Direct Sparse Odometry，直接稀疏里程计。作为vSLAM直接法中开山鼻祖，在vSLAM方法中具有比较高的地位，并且其算法原理考虑内容比较多，代码的实现上更是接近底层（甚至底层到优化过程、字节对齐都是自己实现）。因此我认为DSO是一个非常值得学习和借鉴的vSLAM直接法。&lt;/p&gt;
 &lt;p&gt;在这本篇中，我打算着重解释什么是Direct，什么是Indirect；什么是Sparse，什么是Dense。它们之间到底有什么区别，具体的优劣势又在哪？&lt;/p&gt;
-&lt;h2 id="直接法-和-非直接法"&gt;1. 直接法 和&amp;nbsp;非直接法&lt;/h2&gt;
+&lt;h2 id="1"&gt;1. 直接法 和 非直接法&lt;/h2&gt;
 &lt;p&gt;在SLAM十四讲中的第8章（视觉里程计2）中，提到了直接法的概念和基本原理，重点在于像素级别的灰度不变性，通过灰度不变假设构建优化模型。这里与非直接法，通过构建重投影误差有本质区别。&lt;/p&gt;
-&lt;h3 id="直接法"&gt;1.1&amp;nbsp;直接法&lt;/h3&gt;
-&lt;p&gt;&lt;span class="math display"&gt;&lt;em&gt;r&lt;/em&gt;&lt;sub&gt;&lt;em&gt;k&lt;/em&gt;&lt;/sub&gt; = &lt;em&gt;I&lt;/em&gt;&lt;sub&gt;&lt;em&gt;j&lt;/em&gt;&lt;/sub&gt;[&lt;em&gt;p&lt;/em&gt;&lt;sub&gt;&lt;em&gt;j&lt;/em&gt;&lt;/sub&gt;] − &lt;em&gt;I&lt;/em&gt;&lt;sub&gt;&lt;em&gt;i&lt;/em&gt;&lt;/sub&gt;[&lt;em&gt;p&lt;/em&gt;&lt;sub&gt;&lt;em&gt;i&lt;/em&gt;&lt;/sub&gt;]&lt;/span&gt;&lt;/p&gt;
-&lt;p&gt;&lt;span class="math display"&gt;$$
-p_j = \pi(T_{ji} * \frac{\pi^{-1}(p_i)}{d_{pi}})&amp;nbsp;$$&lt;/span&gt;&lt;/p&gt;
-&lt;p&gt;正如上面的公式描述的一样，残差应该是ij两帧之间的像素差值。根据灰度不变假设，当&lt;span class="math inline"&gt;&lt;em&gt;p&lt;/em&gt;&lt;sub&gt;&lt;em&gt;i&lt;/em&gt;&lt;/sub&gt;&lt;/span&gt;和&lt;span class="math inline"&gt;&lt;em&gt;p&lt;/em&gt;&lt;sub&gt;&lt;em&gt;j&lt;/em&gt;&lt;/sub&gt;&lt;/span&gt;之间描述的是同一个3d空间中的点时，&lt;span class="math inline"&gt;&lt;em&gt;r&lt;/em&gt;&lt;sub&gt;&lt;em&gt;k&lt;/em&gt;&lt;/sub&gt;&lt;/span&gt;最小，应该为0。为了重点突出灰度不变的假设，并没有考虑仅用一个点投影的非鲁棒性（实际情况下，需要考虑一个patch——像素块的灰度不变假设，这样更鲁邦一些）。&lt;/p&gt;
-&lt;p&gt;&lt;span class="math display"&gt;$$
-\frac{\partial r_k}{\partial \delta \xi_{ji}} = \frac{\partial
-r_k}{\partial I_j} * \frac{\partial I_j}{\partial p_j} * \frac{\partial
-p_j}{\partial \delta \xi_{ji}}&amp;nbsp;$$&lt;/span&gt;&lt;/p&gt;
-&lt;p&gt;&lt;span class="math display"&gt;$$
-\frac{\partial r_k}{\partial d_{pi}} = \frac{\partial r_k}{\partial I_j}
-* \frac{\partial I_j}{\partial p_j} * \frac{\partial p_j}{\partial
-d_{pi}}&amp;nbsp;$$&lt;/span&gt;&lt;/p&gt;
-&lt;p&gt;根据链式法则，可以看到残差对位姿的雅可比矩阵与&lt;span class="math inline"&gt;&lt;em&gt;I&lt;/em&gt;&lt;sub&gt;&lt;em&gt;j&lt;/em&gt;&lt;/sub&gt;&lt;/span&gt;帧的像素梯度有关系。然而由于图像的非凸性比较明显，在经验上，图像的梯度仅能表示2个像素范围内的灰度变化。因此当使用直接法对图像进行跟踪时，需要较好的初始值，并且当跟踪丢失后，就很难进行重定位了。&lt;/p&gt;
+&lt;h3 id="11"&gt;1.1 直接法&lt;/h3&gt;
+&lt;div class="math"&gt;$$
+r_k = I_j[p_j] - I_i[p_i] 
+$$&lt;/div&gt;
+&lt;div class="math"&gt;$$
+p_j = \pi(T_{ji} * \frac{\pi^{-1}(p_i)}{d_{pi}})
+$$&lt;/div&gt;
+&lt;p&gt;正如上面的公式描述的一样，残差应该是ij两帧之间的像素差值。根据灰度不变假设，当&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;和&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;之间描述的是同一个3d空间中的点时，&lt;span class="math"&gt;\(r_k\)&lt;/span&gt;最小，应该为0。为了重点突出灰度不变的假设，并没有考虑仅用一个点投影的非鲁棒性（实际情况下，需要考虑一个patch——像素块的灰度不变假设，这样更鲁邦一些）。&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial r_k}{\partial \delta \xi_{ji}} = \frac{\partial r_k}{\partial I_j} * \frac{\partial I_j}{\partial p_j} * \frac{\partial p_j}{\partial \delta \xi_{ji}}
+$$&lt;/div&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial r_k}{\partial d_{pi}} = \frac{\partial r_k}{\partial I_j} * \frac{\partial I_j}{\partial p_j} * \frac{\partial p_j}{\partial d_{pi}}
+$$&lt;/div&gt;
+&lt;p&gt;根据链式法则，可以看到残差对位姿的雅可比矩阵与&lt;span class="math"&gt;\(I_j\)&lt;/span&gt;帧的像素梯度有关系。然而由于图像的非凸性比较明显，在经验上，图像的梯度仅能表示2个像素范围内的灰度变化。因此当使用直接法对图像进行跟踪时，需要较好的初始值，并且当跟踪丢失后，就很难进行重定位了。&lt;/p&gt;
 &lt;p&gt;但是由于直接法构建的是灰度之间的差异，而不是特征点的计算。因此直接法在算法运行速度上，要比非直接法快得多。&lt;/p&gt;
-&lt;h3 id="非直接法"&gt;1.2&amp;nbsp;非直接法&lt;/h3&gt;
-&lt;p&gt;我最先能想到的非直法就是
-&lt;span class="caps"&gt;ORB&lt;/span&gt;-SLAM系列。经典的特征点匹配，通过BA构建重投影误差。针对非直接法来讲，像素的灰度变化并不会导致非直接法的强烈波动。原因在于，非直接法的特征点是由关键点和描述子两部分组成，具有相当强的稳定性。&lt;/p&gt;
+&lt;h3 id="12"&gt;1.2 非直接法&lt;/h3&gt;
+&lt;p&gt;我最先能想到的非直法就是 &lt;span class="caps"&gt;ORB&lt;/span&gt;-SLAM系列。经典的特征点匹配，通过BA构建重投影误差。针对非直接法来讲，像素的灰度变化并不会导致非直接法的强烈波动。原因在于，非直接法的特征点是由关键点和描述子两部分组成，具有相当强的稳定性。&lt;/p&gt;
 &lt;p&gt;非直接法之所以被称为非直接，是因为非直接法需要将得到的数据进行初步的加工处理，而不是直接使用传感器得到的结果。针对视觉SLAM来讲，传感器得到的数据就是像素点的灰度，而非直接法需要根据灰度和像素位置两方面的信息进行某种方式的计算，从而提取出特征点。而这部分计算任务往往是非直接法中最耗时的部分。&lt;/p&gt;
 &lt;p&gt;由于非直接法的特征点计算总是和像素梯度强相关，当图像中存在弱梯度时，特征点的提取可能失败，并且图像中的梯度越弱，提取出的特征点的鲁棒性和稳定性相对较差。因此特征点法对图像的梯度较敏感。&lt;/p&gt;
-&lt;h3 id="优缺点汇总"&gt;1.3&amp;nbsp;优缺点汇总&lt;/h3&gt;
+&lt;h3 id="13"&gt;1.3 优缺点汇总&lt;/h3&gt;
 &lt;p&gt;根据上面的分析，直接法的优劣势如下：&lt;/p&gt;
-&lt;ol type="1"&gt;
+&lt;ol&gt;
 &lt;li&gt;直接法的速度更快，因为不需要计算特征点。&lt;/li&gt;
 &lt;li&gt;直接法对图像的梯度不是那么敏感。&lt;/li&gt;
 &lt;li&gt;直接法在优化过程中会涉及到像素梯度，因此跟踪失败后，重定位相对困难。&lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;除此之外，要是以回环闭合的角度去讨论的话，非直接法可能更具优势，因为目前视觉SLAM中比较常用的回环检测方法都是基于词袋的。而词袋方法的直接依据往往都是特征点的描述子。&lt;/p&gt;
-&lt;h2 id="稀疏-和-稠密"&gt;2. 稀疏 和&amp;nbsp;稠密&lt;/h2&gt;
+&lt;h2 id="2"&gt;2. 稀疏 和 稠密&lt;/h2&gt;
 &lt;p&gt;在视觉SLAM中，稀疏和稠密主要是用来描述建图过程中是否会考虑点与点之间的关系。在视觉SLAM中，稀疏的方法往往占据主流，因为以优化的角度去讨论，稀疏方法往往不考虑点与点之间的关系，反映在优化的H矩阵中，表现为稀疏的矩阵，或者说引用视觉SLAM十四讲的内容，应该为一个箭头矩阵。只有这种稀疏的箭头矩阵，才能使用Schur消元的方式去加速事实求解。&lt;/p&gt;
 &lt;p&gt;当然，目前也有半稠密的视觉SLAM方法，比如说LSD-&lt;span class="caps"&gt;SLAM&lt;/span&gt;，LSD的方法考虑了点与点之间的连通性关系，但是LSD并没有使用所有的像素点来构建地图，因此在学术上称这种方法为半稠密。LSD使用了GPU，来实时的解一个稠密的H矩阵。&lt;/p&gt;
-&lt;p&gt;考虑像素中的所有点，并且考虑点与点之间的关系问题，在SFM问题中比较常见，即3D重建任务（从移动中恢复结构）。这种问题往往都是离线，使用多GPU的方式求解，重点在于恢复3D空间结构，而不是实时的给出相机位姿。&lt;/p&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry><entry><title>公式测试</title><link href="https://sunshanlu.github.io/dso_ssl/Math-Test" rel="alternate"></link><published>2025-01-02T00:00:00+08:00</published><updated>2025-01-02T00:00:00+08:00</updated><author><name>ssl</name></author><id>tag:sunshanlu.github.io,2025-01-02:/dso_ssl/Math-Test</id><content type="html">&lt;p&gt;&lt;span class="math display"&gt;&lt;em&gt;r&lt;/em&gt;&lt;sub&gt;&lt;em&gt;k&lt;/em&gt;&lt;/sub&gt; = &lt;em&gt;I&lt;/em&gt;&lt;sub&gt;&lt;em&gt;j&lt;/em&gt;&lt;/sub&gt;[&lt;em&gt;p&lt;/em&gt;&lt;sub&gt;&lt;em&gt;j&lt;/em&gt;&lt;/sub&gt;] − &lt;em&gt;I&lt;/em&gt;&lt;sub&gt;&lt;em&gt;i&lt;/em&gt;&lt;/sub&gt;[&lt;em&gt;p&lt;/em&gt;&lt;sub&gt;&lt;em&gt;i&lt;/em&gt;&lt;/sub&gt;]&lt;/span&gt;&lt;/p&gt;
-&lt;p&gt;&lt;span class="math display"&gt;$$p_j = \pi(T_{ji} *&amp;nbsp;\frac{\pi^{-1}(p_i)}{d_{pi}})$$&lt;/span&gt;&lt;/p&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry></feed>
+&lt;p&gt;考虑像素中的所有点，并且考虑点与点之间的关系问题，在SFM问题中比较常见，即3D重建任务（从移动中恢复结构）。这种问题往往都是离线，使用多GPU的方式求解，重点在于恢复3D空间结构，而不是实时的给出相机位姿。&lt;/p&gt;
+&lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry></feed>

@@ -8421,7 +8421,7 @@ ul.multi-parts-list li.active-part {
 
 .table-of-content .toc ul {
     list-style-type: none;
-    /* list-style: symbols none inside; */
+    list-style: symbols none inside;
     margin: 0;
     padding: 0 0 0 .2rem
 }
@@ -9574,8 +9574,7 @@ div.recent-posts time,
 footer,
 ul.list-articles-under-tag-category li time {
     font-family: PT Sans, Helvetica Neue, Helvetica, Arial, sans-serif;
-    /* font-family: var(--sansFontFamily); */
-    font-family: var(--serifFontFamily);
+    font-family: var(--sansFontFamily);
     font-size: .8rem
 }
 

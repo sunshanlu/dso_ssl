@@ -40,6 +40,8 @@
 
 
 
+        <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
     </head>
     <body>
         <div id="content">
@@ -85,17 +87,13 @@
                 <h1 id="about-me">SSL的SLAM系列 - <span class="caps">DSO</span></h1>
             </header>
             <div class="article-content">
-                <p><code>DSO</code> 是 <code>vSLAM</code>
-的一个重要的开源实现，它基于直接法，考虑了相机成像过程，使用光度标定或者仿射参数进行相机测量的直接矫正，使用相对高效的帧管理和点管理策略来维护整个滑动窗口。在优化阶段，使用自定义的优化器，充分使用了intel芯片的<code>SIMD</code>指令集来对整个优化过程进行加速。除此之外，它还制定了不同的策略，来防止解在零空间上的漂移，例如系统的正交投影、解的正交投影、SVD分解置零和固定初始帧的策略。除此之外，由于它的整个系统涉及到滑动窗口的点边缘化和帧边缘化，它使用部分<code>FEJ</code>的方式来防止这种边缘化的误操作行为导致的部分不客观的维度变得可观情况的发生。</p>
-<h2 id="dso的代码解读">DSO的代码解读</h2>
-<p><img alt="RobotLU" src="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-180x180.png" style="float: right; margin-left: 10px; width: 150; height: 150;"/></p>
-<p>我使用了一个多月的时间，完成了<code>DSO</code>的源码解读，我想使用记录的博客随机记录的方式对整个<code>DSO</code>的源码按照我的理解进行梳理。在这个博客随笔中，你可以从我的角度了解到
-Direct和 Indirect的区别，Sparse 和
-Dense的区别、<code>DSO</code>中的相机标定内容（畸变模型到pinhole模型的转换、光度去畸变）、<code>DSO</code>中的点选策略（像素点选择）、<code>DSO</code>考虑平移距离的初始化策略、<code>DSO</code>的跟踪策略、<code>DSO</code>的滑窗优化（涉及<code>FEJ</code>，local转global以及HM和bM的维护策略）。</p>
-<h2 id="dso的源码重写">DSO的源码重写</h2>
-<p>todo:
-我计划对整个<code>DSO</code>进行重写，重写的<code>DSO</code>源码应该比较符合我自己的代码风格，感兴趣的朋友可以参考我的DSO重写仓库：<a href="https://github.com/sunshanlu/dso_ssl">DSO_SSL</a>。</p>
-<h2 id="相关链接">相关链接</h2>
+                <p><code>DSO</code> 是 <code>vSLAM</code> 的一个重要的开源实现，它基于直接法，考虑了相机成像过程，使用光度标定或者仿射参数进行相机测量的直接矫正，使用相对高效的帧管理和点管理策略来维护整个滑动窗口。在优化阶段，使用自定义的优化器，充分使用了intel芯片的<code>SIMD</code>指令集来对整个优化过程进行加速。除此之外，它还制定了不同的策略，来防止解在零空间上的漂移，例如系统的正交投影、解的正交投影、SVD分解置零和固定初始帧的策略。除此之外，由于它的整个系统涉及到滑动窗口的点边缘化和帧边缘化，它使用部分<code>FEJ</code>的方式来防止这种边缘化的误操作行为导致的部分不客观的维度变得可观情况的发生。</p>
+<h2 id="dso">DSO的代码解读</h2>
+<p><img src="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-180x180.png" alt="RobotLU" style="float: right; margin-left: 10px; width: 150; height: 150;"></p>
+<p>我使用了一个多月的时间，完成了<code>DSO</code>的源码解读，我想使用记录的博客随机记录的方式对整个<code>DSO</code>的源码按照我的理解进行梳理。在这个博客随笔中，你可以从我的角度了解到 Direct和 Indirect的区别，Sparse 和 Dense的区别、<code>DSO</code>中的相机标定内容（畸变模型到pinhole模型的转换、光度去畸变）、<code>DSO</code>中的点选策略（像素点选择）、<code>DSO</code>考虑平移距离的初始化策略、<code>DSO</code>的跟踪策略、<code>DSO</code>的滑窗优化（涉及<code>FEJ</code>，local转global以及HM和bM的维护策略）。</p>
+<h2 id="dso_1">DSO的源码重写</h2>
+<p>我计划对整个<code>DSO</code>进行重写，重写的<code>DSO</code>源码应该比较符合我自己的代码风格，感兴趣的朋友可以关注我的DSO重写仓库：<a href="https://github.com/sunshanlu/dso_ssl">DSO_SSL</a>。</p>
+<h2 id="_1">相关链接</h2>
 <ul>
 <li><a href="https://github.com/sunshanlu/dso_ssl">我的DSO重写仓库：dso_ssl</a></li>
 <li><a href="https://space.bilibili.com/489032586">我的bilibili主页：rookie-lu</a></li>
@@ -138,23 +136,23 @@ Dense的区别、<code>DSO</code>中的相机标定内容（畸变模型到pinho
             </header>
         <div class="recent-posts">
             <div itemscope class="recent-posts-article">
+                <a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO">
+                    DSO中的去畸变操作
+                </a>
+                <div class="recent-posts-posted">
+                    posted in
+                    <a href="https://sunshanlu.github.io/dso_ssl/categories#dso-ref">DSO</a>
+                    <time itemprop="dateCreated" datetime="2025-01-09T00:00:00+08:00">2025-01-09</time>
+                </div>
+            </div>
+            <div itemscope class="recent-posts-article">
                 <a href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO">
                     DSO的算法优势
                 </a>
                 <div class="recent-posts-posted">
                     posted in
                     <a href="https://sunshanlu.github.io/dso_ssl/categories#dso-ref">DSO</a>
-                    <time itemprop="dateCreated" datetime="2025-01-02T00:00:00+08:00">1月 02, 2025</time>
-                </div>
-            </div>
-            <div itemscope class="recent-posts-article">
-                <a href="https://sunshanlu.github.io/dso_ssl/Math-Test">
-                    公式测试
-                </a>
-                <div class="recent-posts-posted">
-                    posted in
-                    <a href="https://sunshanlu.github.io/dso_ssl/categories#dso-ref">DSO</a>
-                    <time itemprop="dateCreated" datetime="2025-01-02T00:00:00+08:00">1月 02, 2025</time>
+                    <time itemprop="dateCreated" datetime="2025-01-02T00:00:00+08:00">2025-01-02</time>
                 </div>
             </div>
         </div>
