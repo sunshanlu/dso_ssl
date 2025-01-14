@@ -1,5 +1,128 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/dso.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-09T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的去畸变操作</title><link href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" rel="alternate"></link><published>2025-01-09T00:00:00+08:00</published><updated>2025-01-09T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-09:/dso_ssl/De-distortion-in-DSO</id><summary type="html">
+<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/dso.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-14T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的点选策略</title><link href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO" rel="alternate"></link><published>2025-01-14T00:00:00+08:00</published><updated>2025-01-14T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-14:/dso_ssl/Point-select-in-DSO</id><summary type="html">
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;作为一个稀疏直接法，其中一个核心内容就是对图像上的部分点进行跟踪和&lt;strong&gt;逆深度&lt;/strong&gt;估计，既然是对图像上的某些点进 …&lt;/p&gt;</summary><content type="html">
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;作为一个稀疏直接法，其中一个核心内容就是对图像上的部分点进行跟踪和&lt;strong&gt;逆深度&lt;/strong&gt;估计，既然是对图像上的某些点进行跟踪估计操作，那么肯定会涉及到如何在图像上选择点的操作，在整个&lt;code&gt;DSO&lt;/code&gt;的算法逻辑中，点选策略主要使用在两个阶段，一个是&lt;strong&gt;算法初始化阶段&lt;/strong&gt;，还有一个是&lt;strong&gt;创建关键帧阶段&lt;/strong&gt;。&lt;/p&gt;
+&lt;h2 id="1"&gt;1. 初始化阶段的点选策略&lt;/h2&gt;
+&lt;p&gt;在&lt;code&gt;DSO&lt;/code&gt;的初始化过程中，需要确定一个初始化参考帧，当然为了初始化的稳定和准确性，需要构建图像金字塔来完成初始化参考帧的构建。当然初始化部分我会单独出一个文章来进行讲解，这里主要是对初始化过程中的点选策略进行分析，大家只需要记住在初始化过程中需要对初始化关键帧进行&lt;strong&gt;金字塔多层级&lt;/strong&gt;的点选操作，以供后续的初始化操作使用即可，至于为什么使用金字塔？或者为什么使用这样的点选策略，我会在后续的&lt;code&gt;DSO&lt;/code&gt;初始化文章中进行阐述。&lt;/p&gt;
+&lt;h3 id="11"&gt;1.1 金字塔第零层点选&lt;/h3&gt;
+&lt;p&gt;第0层的金字塔点的选择的要求主要有以下三点：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;数量要求&lt;/strong&gt;：第0层上选择的点的数量要满足要求，这因该是最基本的选点要求；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;特殊性要求&lt;/strong&gt;：第0层上选择的点要具有一定的特殊性，能够对模型提供比较大信息，在&lt;a href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO"&gt;Advantages-of-&lt;span class="caps"&gt;DSO&lt;/span&gt;&lt;/a&gt;文章里面提到，直接法往往和像素梯度直接相关，因此大梯度点，往往能对模型优化提供一个相对多的信息；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;均匀性要求&lt;/strong&gt;：第0层上选择的点要求具有一定的均匀性，保证位姿估计的稳定性，因为大梯度点，往往在图像的极个别区域内集中分布，选择均匀分布的大梯度点，往往能规避集中分布的像素点导致位姿估计的不稳定性问题；&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;首先使用&lt;strong&gt;块阈值计算策略&lt;/strong&gt;，将输入图像（经过光度畸变矫正和像素畸变矫正）划分为&lt;code&gt;32px * 32px&lt;/code&gt;的&lt;code&gt;n&lt;/code&gt;多个小像素块，对每个块内独立的统计像素梯度的均方根，找到&lt;code&gt;0.5&lt;/code&gt;分位数对应的均方根梯度值，然后加上一个超参数&lt;code&gt;bias&lt;/code&gt;的方式，作为大梯度阈值，除此之外，为了保证整张图像的块梯度平滑性，使用一个&lt;code&gt;3 * 3&lt;/code&gt;的均值滤波来对块梯度阈值进行操作。使用上述的块阈值计算策略，可以为后续提供不同区域下的梯度阈值，满足了点选要求的&lt;strong&gt;特殊性&lt;/strong&gt;和&lt;strong&gt;均匀性&lt;/strong&gt;，整个块阈值计算策略如下图所示。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img alt="块阈值计算策略" src="https://sunshanlu.github.io/dso_ssl/images/grad-th.png" width="100%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;使用&lt;strong&gt;定&lt;code&gt;pot&lt;/code&gt;选点策略&lt;/strong&gt;，首先使用给定的&lt;code&gt;pot&lt;/code&gt;，依次从&lt;code&gt;4pot * 4pot&lt;/code&gt;到&lt;code&gt;2pot * 2pot&lt;/code&gt;再到&lt;code&gt;pot * pot&lt;/code&gt;的区域内，进行遍历，试图找到满足阈值条件的像素点。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;首先，针对最内层的&lt;code&gt;pot * pot&lt;/code&gt;区域内，进行逐像素的遍历，找到&lt;code&gt;pot * pot&lt;/code&gt;区域内的最大梯度像素点，并且要满足最大像素梯度值要大于&lt;strong&gt;块阈值计算策略&lt;/strong&gt;中计算的平滑阈值。&lt;/li&gt;
+&lt;li&gt;当完成了&lt;code&gt;2pot * 2pot&lt;/code&gt;内的&lt;code&gt;pot * pot&lt;/code&gt;的遍历后，如果区域内的4个&lt;code&gt;pot * pot&lt;/code&gt;区域没有找到一个满足阈值条件的像素点（在&lt;code&gt;DSO&lt;/code&gt;中，会将这部分像素点从0层投影到1层，使用1层的梯度进行阈值条件判断），那么这里将阈值要求降低&lt;code&gt;0.75&lt;/code&gt;倍，然后重新遍历&lt;code&gt;2pot * 2pot&lt;/code&gt;区域内的所有像素试图找到一个满足阈值条件的像素点（这里的阈值条件已经降低了0.75倍数）。&lt;/li&gt;
+&lt;li&gt;当完成了&lt;code&gt;4pot * 4pot&lt;/code&gt;内的&lt;code&gt;2pot * 2pot&lt;/code&gt;的遍历后，如果区域内的4个&lt;code&gt;2pot * 2pot&lt;/code&gt;区域内没有找到一个满足阈值条件的像素点，那么这里将阈值要求再次降低&lt;code&gt;0.75&lt;/code&gt;倍，然后重新遍历&lt;code&gt;4pot * 4pot&lt;/code&gt;区域内的所有像素点（在&lt;code&gt;DSO&lt;/code&gt;中，会将这部分像素点从0层投影到2层，使用2层的梯度进行阈值条件判断），试图找到一个满足阈值条件的像素点（这里的阈值条件已经降低了&lt;code&gt;0.75 * 0.75&lt;/code&gt;）倍。&lt;/li&gt;
+&lt;li&gt;使用这种&lt;strong&gt;定&lt;code&gt;pot&lt;/code&gt;选点策略&lt;/strong&gt;，可以保证选点要求的&lt;strong&gt;均匀性&lt;/strong&gt;和&lt;strong&gt;特殊性&lt;/strong&gt;，除了可以保证&lt;strong&gt;均匀性&lt;/strong&gt;外，该策略还可以在图像梯度值比较低的条件下完成特征的提取，因为这里涉及到梯度阈值的降低，该策略的示意图如下所示。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div align="center"&gt;
+&lt;img alt="定pot选点策略" src="https://sunshanlu.github.io/dso_ssl/images/pot-select.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;定&lt;code&gt;pot&lt;/code&gt;选点策略的加速&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;中的定&lt;code&gt;pot&lt;/code&gt;选点策略的思路就是我在上面描述的那样，但是反映在代码逻辑上，存在着一些可以加速的策略，比如说在&lt;code&gt;DSO&lt;/code&gt;的源码部分，当小区域&lt;code&gt;pot * pot&lt;/code&gt;对应的像素点任何点达到梯度阈值要求的时候，会同步判断&lt;code&gt;2pot * 2pot&lt;/code&gt;和&lt;code&gt;4pot * 4pot&lt;/code&gt;大区域是否满足阈值条件的要求，只有当小区域出现满足阈值条件要求的像素点时，才放弃对大区域内像素点的梯度判断，从而避免了小区域内没选到点而再次遍历的尴尬逻辑。
+当然，除此之外，还可以使用多线程加速的策略，即每个区域的所有像素点对应一个线程，三个线程同时进行遍历和判断，然后对最后得到的结果进行统计，取小区域中满足阈值要求的点。当&lt;code&gt;cpu&lt;/code&gt;的性能足够时，这也不失为一种加速策略。&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;使用&lt;strong&gt;递归&lt;code&gt;pot&lt;/code&gt;随动策略&lt;/strong&gt;，来保证选点要求的&lt;strong&gt;数量要求&lt;/strong&gt;。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;通过分析，不难发现，调整&lt;code&gt;pot&lt;/code&gt;的大小可以间接的提点数量进行控制。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DSO&lt;/code&gt;中，使用&lt;code&gt;pot=3&lt;/code&gt;作为初始的&lt;code&gt;pot&lt;/code&gt;大小，通过&lt;strong&gt;定&lt;code&gt;pot&lt;/code&gt;选点策略&lt;/strong&gt;来选择均匀且带有特殊性的像素点。&lt;/li&gt;
+&lt;li&gt;当选择到的点比期望的点多时，说明当前的&lt;code&gt;pot&lt;/code&gt;比较小，得到的&lt;code&gt;pot * pot&lt;/code&gt;的区域比较多，因此需要递增&lt;code&gt;pot&lt;/code&gt;的大小。&lt;/li&gt;
+&lt;li&gt;当选择到的点比期望的点少时，说明当前的&lt;code&gt;pot&lt;/code&gt;比较大，得到的&lt;code&gt;pot * pot&lt;/code&gt;的区域比较少，因此需要递减&lt;code&gt;pot&lt;/code&gt;的大小。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;与期望数目之间差多少才算多？&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;在源码中，规定了一个尺度范围&lt;code&gt;ratio&lt;/code&gt;为&lt;span class="math"&gt;\([0.25,1.25]\)&lt;/span&gt;，注意这个尺度范围&lt;code&gt;ratio&lt;/code&gt;指的是 &lt;strong&gt;期望值 / 提取值&lt;/strong&gt;，当&lt;code&gt;ratio &amp;lt; 0.25&lt;/code&gt;时，认定此时提取的点比较多，需要递增&lt;code&gt;pot&lt;/code&gt;的大小，当&lt;code&gt;ratio &amp;gt; 1.25&lt;/code&gt;时，认定此时提取的点比较少，需要递减&lt;code&gt;pot&lt;/code&gt;的大小。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h3 id="12"&gt;1.2 金字塔其他层点选&lt;/h3&gt;
+&lt;p&gt;在初始化过程中，金字塔的其他层选择相对简单，也存在一些&lt;strong&gt;定&lt;code&gt;pot&lt;/code&gt;选点策略&lt;/strong&gt;和&lt;strong&gt;递归&lt;code&gt;pot&lt;/code&gt;随动策略&lt;/strong&gt;来保证特征点的&lt;strong&gt;均匀性&lt;/strong&gt;要求和&lt;strong&gt;数量一致性&lt;/strong&gt;要求。但是这两种策略与第0层选点使用的&lt;strong&gt;定&lt;code&gt;pot&lt;/code&gt;选点策略&lt;/strong&gt;和&lt;strong&gt;递归&lt;code&gt;pot&lt;/code&gt;随动策略&lt;/strong&gt;不太一样，这里仅单独的进行一些说明。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;首先，在阈值方面，金字塔其它层的提取使用定阈值&lt;code&gt;10&lt;/code&gt;和阈值缩放因子&lt;code&gt;scaleTH&lt;/code&gt;一起决定，即阈值的大小与缩放因子相关。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;定&lt;code&gt;pot&lt;/code&gt;选点策略&lt;/strong&gt;，不像第0层那样，由&lt;code&gt;4pot * 4pot&lt;/code&gt; 到 &lt;code&gt;2pot * 2pot&lt;/code&gt; 再到 &lt;code&gt;pot * pot&lt;/code&gt;那样以此降低阈值来提点了，而是仅&lt;code&gt;pot * pot&lt;/code&gt;区域的遍历，试图找到&lt;strong&gt;最多4个&lt;/strong&gt;像素点，该像素点要求阈值大于给定的&lt;code&gt;10 * scaleTH&lt;/code&gt;，并且其x轴梯度最大，或y轴梯度最大，或x轴 - y轴梯度最大，或x轴 + y轴梯度最大。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;递归&lt;code&gt;pot&lt;/code&gt;随动策略&lt;/strong&gt;，同样不像第0层那样，它考虑了一个&lt;strong&gt;模型&lt;/strong&gt;，认定可以提取的点与&lt;code&gt;pot&lt;/code&gt;的大小成反比，即&lt;span class="math"&gt;\(pot^2*num=K\)&lt;/span&gt;，也就是说，首先使用一个默认&lt;code&gt;pot&lt;/code&gt;进行点选，然后根据点选的数量和默认&lt;code&gt;pot&lt;/code&gt;的大小，确定&lt;span class="math"&gt;\(K\)&lt;/span&gt;值，然后使用&lt;span class="math"&gt;\(K\)&lt;/span&gt;值计算期望的&lt;code&gt;pot&lt;/code&gt;大小，然后递归的调用即可，其原理可以由下面的公式解释。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="math"&gt;$$
+\frac{pot_d^2}{pot^2}=\frac{n_{have}}{n_{desir}}
+$$&lt;/div&gt;
+&lt;p&gt;其中，&lt;span class="math"&gt;\(pot_d\)&lt;/span&gt;为期望的&lt;code&gt;pot&lt;/code&gt;大小，&lt;span class="math"&gt;\(pot\)&lt;/span&gt;为当前提取的&lt;code&gt;pot&lt;/code&gt;大小，&lt;span class="math"&gt;\(n_{have}\)&lt;/span&gt;为使用&lt;span class="math"&gt;\(pot\)&lt;/span&gt;提取到的点的数量，&lt;span class="math"&gt;\(n_{desir}\)&lt;/span&gt;为期望提取的点的数量。&lt;/p&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;递归停止条件&lt;/p&gt;
+&lt;p&gt;由于&lt;code&gt;pot&lt;/code&gt;总是一个整数，因此使用整型的&lt;code&gt;pot&lt;/code&gt;可能永远得到不期望的提取数量，因此这里需要设置一个递归的停止条件。
+接下来，需要确定一个比例范围&lt;code&gt;ratio&lt;/code&gt;，来定义比期望值多或者比期望值少，&lt;code&gt;DSO&lt;/code&gt;的源码中定义这个比例范围为&lt;span class="math"&gt;\([0.8,1.2]\)&lt;/span&gt;，这个比例是&lt;strong&gt;提取值 / 期望值&lt;/strong&gt;（注意与第0层的比例意义不同）。
+首先考虑，&lt;code&gt;pot=1&lt;/code&gt;时，提取到的点仍然远少于期望提取的点，那么需要考虑减小&lt;code&gt;scaleTH&lt;/code&gt;来放宽梯度阈值条件。
+当使用的 (提取&lt;span class="math"&gt;\(pot-pot_{d}=0\)&lt;/span&gt;) || (&lt;span class="math"&gt;\(n_{have}/n_{desir}\in[0.8,1.2]\)&lt;/span&gt;) || (达到最大要求递归次数)，则退出递归。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h2 id="2"&gt;2. 创建关键帧阶段的点选策略&lt;/h2&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的点选策略除了用在初始化阶段外，还会用在新关键帧的创建阶段。当新关键帧被创建时，&lt;code&gt;DSO&lt;/code&gt;会使用初始化过程中，金字塔第零层点选策略来进行像素点的选取，并初始化为未成熟点，以供后续跟踪过程的逆深度优化。&lt;/p&gt;
+&lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry><entry><title>DSO中的去畸变操作</title><link href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" rel="alternate"></link><published>2025-01-09T00:00:00+08:00</published><updated>2025-01-09T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-09:/dso_ssl/De-distortion-in-DSO</id><summary type="html">
 &lt;h2 id="1"&gt;1. 像素去畸变&lt;/h2&gt;
 &lt;h3 id="11"&gt;1.1 畸变模型&lt;/h3&gt;
 &lt;p&gt;DSO中引入了不同的畸变模型，来解决不同相机的像素畸变问题，除了我们在SLAM十四讲里面熟知的&lt;code&gt;RadTan&lt;/code&gt;畸变模型外，还有&lt;code&gt;FOV&lt;/code&gt;和&lt;code&gt;KannalaBrandt&lt;/code&gt;畸变模型。不同 …&lt;/p&gt;</summary><content type="html">
@@ -66,6 +189,11 @@ K = \begin{bmatrix}
     0 &amp;amp; 0 &amp;amp; 1
 \end{bmatrix}
 $$&lt;/div&gt;
+&lt;p&gt;在得到纯小孔成像模型的相机内参矩阵&lt;code&gt;K&lt;/code&gt;后，为了更加方便的实现畸变图像到非畸变图像的转换，&lt;code&gt;DSO&lt;/code&gt;维护了一组映射表&lt;code&gt;remapX&lt;/code&gt;和&lt;code&gt;remapY&lt;/code&gt;。这组映射表的构建逻辑也比较简单，可以通过下面的这张图进行表示：&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img alt="distorted image" src="https://sunshanlu.github.io/dso_ssl/images/remap.png" width="100%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;针对无畸变坐标系下的某个像素点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;，通过反向投影到归一化坐标系下得到&lt;span class="math"&gt;\(p_{norm}\)&lt;/span&gt;，然后使用畸变参数模型在归一化坐标系下对点&lt;span class="math"&gt;\(p_{norm}\)&lt;/span&gt;进行畸变处理得到点&lt;span class="math"&gt;\(p_{norm}^{dis}\)&lt;/span&gt;，然后使用原来的相机内参&lt;span class="math"&gt;\(K_{org}\)&lt;/span&gt;进行投影，得到无畸变像素坐标系点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;和有畸变像素坐标系&lt;span class="math"&gt;\(p_i^{dis}\)&lt;/span&gt;之间的映射关系。&lt;code&gt;DSO&lt;/code&gt;将这部分对应起来的映射关系存储到&lt;code&gt;remapX&lt;/code&gt;和&lt;code&gt;remapY&lt;/code&gt;中，以便快速的进行无畸变图像的构建。这里还需要注意的是，使用映射表得到畸变像素坐标后，需要使用双线性插值实现像素值或者说是像素能量值（光度去畸变后）的精确获取。&lt;/p&gt;
 &lt;h2 id="2"&gt;2. 光度去畸变&lt;/h2&gt;
 &lt;h3 id="21"&gt;2.1 光度畸变模型&lt;/h3&gt;
 &lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的作者考虑了相机的成像过程，针对形成漫反射的某个点&lt;code&gt;p&lt;/code&gt;来讲,它会产生辐射&lt;span class="math"&gt;\(B_i(x)\)&lt;/span&gt;，相机的感光器件会接收到这个这个点的辐射&lt;span class="math"&gt;\(B_i(x)\)&lt;/span&gt;。但是由于辐射在相机的透镜中会发生一些扭曲，造成相机成像的渐晕现象（中间部分接收的辐射较高，而周围的较低），这种渐晕会被建模称&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;，一般会用一张和成像尺寸相同的灰度图来表示，下面是&lt;code&gt;TUM/sequence_29&lt;/code&gt;数据集中的渐晕图表示。&lt;/p&gt;
@@ -87,6 +215,10 @@ $$&lt;/div&gt;
 I'_i(x) = e^{a_i}I_i(x) - b_i
 $$&lt;/div&gt;
 &lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的论文里面还这样描述：这里乘法因子使用&lt;span class="math"&gt;\(e^{a_i}\)&lt;/span&gt;而不是直接使用&lt;span class="math"&gt;\(a_i\)&lt;/span&gt;的原因是，使用指数函数，既可以防止其乘法项变为负数，又可以避免因乘法漂移而产生的数值问题。&lt;/p&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;注意去畸变的先后顺序&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的畸变处理顺序是先进行光度去畸变，在进行像素去畸变，这么做的原因在于，针对渐晕&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;的表达形式是与原图大小相同的灰度图，因此如果先进行像素去畸变，然后再进行光度去畸变的话，在消除渐晕部分可能会需要&lt;code&gt;remapX&lt;/code&gt;和&lt;code&gt;remapY&lt;/code&gt;的映射表来找到一个真实的渐晕位置，这样还会涉及到双线性插值，会导致计算量上的增加。&lt;/p&gt;
+&lt;/div&gt;
 &lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
     var align = "center",
         indent = "0em",

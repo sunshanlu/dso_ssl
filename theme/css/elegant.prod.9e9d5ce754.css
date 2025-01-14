@@ -9576,7 +9576,7 @@ ul.list-articles-under-tag-category li time {
     font-family: PT Sans, Helvetica Neue, Helvetica, Arial, sans-serif;
     /* font-family: var(--sansFontFamily); */
     font-family: var(--serifFontFamily);
-    font-size: .8rem
+    font-size: 1.1rem
 }
 
 span.superscript {
