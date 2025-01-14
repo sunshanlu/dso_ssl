@@ -1,4 +1,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://elegant.oncrashreboot.com/sitemap.xml
+Sitemap: https://sunshanlu.github.io/dso_ssl/sitemap.xml

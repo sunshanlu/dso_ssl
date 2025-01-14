@@ -15,3 +15,16 @@ GOOGLE_ANALYTICS = os.environ.get("GOOGLE_ANALYTICS_PROD")
 
 RELATIVE_URLS = False
 DELETE_OUTPUT_DIRECTORY = True
+
+AUTHORS = {
+    "孙善路-github": {
+        "url": "https://github.com/sunshanlu",
+        "blurb": "对SLAM和DL感兴趣的理工男",
+        "avatar": "https://avatars.githubusercontent.com/u/78467062",
+    },
+    "孙善路-bilibili": {
+        "url": "https://space.bilibili.com/489032586",
+        "blurb": "对SLAM和DL感兴趣的理工男",
+        "avatar": SITEURL + "/images/avatars/sunshanlu.png",
+    },
+}

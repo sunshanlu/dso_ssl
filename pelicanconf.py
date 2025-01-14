@@ -9,7 +9,7 @@ PATH = "content"
 
 # Regional Settings
 TIMEZONE = "Asia/Shanghai"
-DATE_FORMATS = {"en": "%b %d, %Y"}
+DATE_FORMATS = {"en": "%Y-%m-%d"}
 
 DEFAULT_LANG = "en"
 
@@ -26,9 +26,9 @@ MARKDOWN = {
 
 PLUGIN_PATHS = ["plugins"]
 PLUGINS = [
-    "extract_toc",
-    "tipue_search",
     "siteurl_replacer",
+    "pelican.plugins.extract_toc",
+    "pelican.plugins.tipue_search",
     "pelican.plugins.liquid_tags.img",
     "pelican.plugins.liquid_tags.include_code",
     "pelican.plugins.neighbors",
@@ -36,7 +36,10 @@ PLUGINS = [
     "pelican.plugins.series",
     "pelican.plugins.share_post",
     "pelican.plugins.sitemap",
+    "pelican.plugins.render_math",
 ]
+
+MATH_JAX = {"color": "#145402", "align": "center"}
 
 # 用于配置站点地图，方便搜索引擎的内容抓取
 SITEMAP = {
@@ -75,16 +78,14 @@ SOCIAL = (
 )
 
 # Elegant Themes
-STATIC_PATHS = ["theme/images", "images", "code"]
+STATIC_PATHS = ["theme/images", "images", "files"]
 EXTRA_PATH_METADATA = dict()
 
+STATIC_PATHS.append("extra/robots.txt")
+EXTRA_PATH_METADATA["extra/robots.txt"] = {"path": "robots.txt"}
 
-if os.environ.get("CONTEXT") == "production":
-    STATIC_PATHS.append("extra/robots.txt")
-    EXTRA_PATH_METADATA["extra/robots.txt"] = {"path": "robots.txt"}
-else:
-    STATIC_PATHS.append("extra/robots_deny.txt")
-    EXTRA_PATH_METADATA["extra/robots_deny.txt"] = {"path": "robots.txt"}
+STATIC_PATHS.append("theme/images/favicon.ico")
+EXTRA_PATH_METADATA["theme/images/favicon.ico"] = {"path": "favicon.ico"}
 
 DIRECT_TEMPLATES = ["index", "tags", "categories", "archives", "search", "404"]
 TAG_SAVE_AS = ""
@@ -147,7 +148,7 @@ AUTHORS = {
     "孙善路-bilibili": {
         "url": "https://space.bilibili.com/489032586",
         "blurb": "对SLAM和DL感兴趣的理工男",
-        "avatar": "/images/avatars/sunshanlu.png",
+        "avatar": SITEURL + "/images/avatars/sunshanlu.png",
     },
 }
 
@@ -163,7 +164,7 @@ CLAIM_GOOGLE = "UpDPegqFb_TnOIJbDp5ud8wVncaUoUB-fJoQyiiAdmg"
 
 # 启用 Jinja2 支持
 JINJA_ENVIRONMENT = {
-    'extensions': [],
-    'trim_blocks': True,
-    'lstrip_blocks': True,
+    "extensions": [],
+    "trim_blocks": True,
+    "lstrip_blocks": True,
 }
