@@ -12,7 +12,7 @@ slug: landing-page-about-hidden
 
 ## DSO的代码解读
 
-<img src="{{ SITEURL }}/theme/images/apple-touch-icon-180x180.png" alt="RobotLU" style="float: right; margin-left: 10px; width: 150; height: 150;">
+<img src="../theme/images/apple-touch-icon-180x180.png" alt="RobotLU" style="float: right; margin-left: 10px; width: 150; height: 150;">
 
 我使用了一个多月的时间，完成了`DSO`的源码解读，我想使用记录的博客随机记录的方式对整个`DSO`的源码按照我的理解进行梳理。在这个博客随笔中，你可以从我的角度了解到 Direct和 Indirect的区别，Sparse 和 Dense的区别、`DSO`中的相机标定内容（畸变模型到pinhole模型的转换、光度去畸变）、`DSO`中的点选策略（像素点选择）、`DSO`考虑平移距离的初始化策略、`DSO`的跟踪策略、`DSO`的滑窗优化（涉及`FEJ`，local转global以及HM和bM的维护策略）。
 
