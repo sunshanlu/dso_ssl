@@ -1,5 +1,256 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/dso.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-14T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的点选策略</title><link href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO" rel="alternate"></link><published>2025-01-14T00:00:00+08:00</published><updated>2025-01-14T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-14:/dso_ssl/Point-select-in-DSO</id><summary type="html">
+<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/dso.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-15T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的优化模型</title><link href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO" rel="alternate"></link><published>2025-01-15T00:00:00+08:00</published><updated>2025-01-15T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-15:/dso_ssl/Optimization-Model-DSO</id><summary type="html">
+&lt;p&gt;在之前的&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，讲到&lt;code&gt;DSO&lt;/code&gt;考虑了相机的成像过程对图像像素的影响：
+- 在有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用&lt;span class="math"&gt;\(G^{-1}(I)\)&lt;/span&gt;非线性响应 …&lt;/p&gt;&lt;script type='text/javascript'&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</summary><content type="html">
+&lt;p&gt;在之前的&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，讲到&lt;code&gt;DSO&lt;/code&gt;考虑了相机的成像过程对图像像素的影响：
+- 在有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用&lt;span class="math"&gt;\(G^{-1}(I)\)&lt;/span&gt;非线性响应函数的逆过程和渐晕函数&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;进行图像的光度去畸变操作，可以得到由能量单位组成的去光度畸变的图像。
+- 在没有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用仿射参数&lt;code&gt;a&lt;/code&gt;和&lt;code&gt;b&lt;/code&gt;来模拟光度参数的去畸变过程。
+- 在&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，也进行了讨论，即去畸变得到的像素能量并不能保证同一点的一致性，因为还没有考虑曝光时间的影响。&lt;/p&gt;
+&lt;h2 id="1"&gt;1. 构建优化模型&lt;/h2&gt;
+&lt;p&gt;SLAM十四讲中提到，直接法会直接使用像素的灰度值，构建优化模型的残差，其公式表示为&lt;span class="math"&gt;\(r_k=I_i(p_i)-I_j(p_j)\)&lt;/span&gt;。由于&lt;code&gt;DSO&lt;/code&gt;引入了仿射参数去光度畸变的操作，同时考虑了曝光时间对其一致性的影响，构建的残差应该为：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+r_k = \frac{1}{t_i}(e^{a_i} I_i(p_i) - b_i) - \frac{1}{t_j}(e^{a_j} I_i(p_i) - b_j)
+$$&lt;/div&gt;
+&lt;p&gt;通过一些移项和变换的操作，并&lt;strong&gt;考虑像素块&lt;code&gt;pattern&lt;/code&gt;&lt;/strong&gt;的影响，就可以得到&lt;code&gt;DSO&lt;/code&gt;论文里面给出的残差模型了：
+&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_{p_j} = \sum_{p \in \mathcal{N_{p_i}}}{\left | \left | (I_j(p') - b_j) - \frac{t_je^{a_j}}{t_ie^{a_i}}(I_i(p) - b_i) \right |  \right | }_\gamma
+\\
+P_{norm} = \pi^{-1}(p)
+\\
+P' = R_{ji}  P_{norm} + t_{ji} d_{pi}
+\\
+P_{norm}' = \frac{P'}{P'_Z}
+\\
+p' = \pi(P'_{norm})
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(t_i\)&lt;/span&gt;和&lt;span class="math"&gt;\(t_j\)&lt;/span&gt;分别为&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧和&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧的曝光时间，如果不存在曝光时间，则设定&lt;span class="math"&gt;\(t_i=t_j=1\)&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(a_i\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_i\)&lt;/span&gt;为&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧的仿射参数，&lt;span class="math"&gt;\(a_j\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_j\)&lt;/span&gt;为&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧的仿射参数，如果存在光度参数和曝光时间，则设定&lt;span class="math"&gt;\(a_j = a_i = b_j = b_i = 0\)&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(I_i\)&lt;/span&gt;和&lt;span class="math"&gt;\(I_j\)&lt;/span&gt;分别为&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧和&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧的去畸变图像，设定&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧为参考帧，而&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧为待估计帧；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(p\)&lt;/span&gt;和&lt;span class="math"&gt;\(p'\)&lt;/span&gt;分别为&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧上的像素点和&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧上的像素点，其中&lt;span class="math"&gt;\(p'\)&lt;/span&gt;是&lt;span class="math"&gt;\(p\)&lt;/span&gt;经过反向投影，位姿变换和正向投影得到的像素点；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\pi\)&lt;/span&gt;函数指的是从归一化坐标系到像素坐标系的投影，&lt;span class="math"&gt;\(\pi^{-1}\)&lt;/span&gt;是&lt;span class="math"&gt;\(\pi\)&lt;/span&gt;的反函数；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\mathcal{N_{p_i}}\)&lt;/span&gt;为以&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧上的像素点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;为中心的像素块，在&lt;code&gt;DSO&lt;/code&gt;的论文中，把他叫做一个&lt;code&gt;pattern&lt;/code&gt;，&lt;code&gt;DSO&lt;/code&gt;引入&lt;code&gt;pattern&lt;/code&gt;的概念，认为在一个&lt;code&gt;pattern&lt;/code&gt;上，所有像素的&lt;strong&gt;逆深度&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;&lt;/strong&gt;值保持&lt;strong&gt;一致&lt;/strong&gt;，下图中是在&lt;code&gt;DSO&lt;/code&gt;论文中讨论的一些&lt;code&gt;pattern&lt;/code&gt;；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div align="center"&gt;
+&lt;img alt="DSO 中的 pattern 类型" src="https://sunshanlu.github.io/dso_ssl/images/pattern.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;&lt;code&gt;DSO&lt;/code&gt;的投影过程与普通&lt;code&gt;BA&lt;/code&gt;之间存在区别？&lt;/p&gt;
+&lt;p&gt;在&lt;code&gt;DSO&lt;/code&gt;构建的模型中，有一个与普通&lt;code&gt;BA&lt;/code&gt;过程存在明显不同的地方，即在构建完成反向投影后，并不会使用&lt;span class="math"&gt;\(R_{ji}\frac{P_{norm}}{d_{pi}}+t_{ji}\)&lt;/span&gt;来求解真实的&lt;code&gt;3d&lt;/code&gt;点，而是使用&lt;span class="math"&gt;\(R_{ji}P_{norm}+t_{ji}d_{pi}\)&lt;/span&gt;的方式，乘在了右边，构建了一个虚拟的&lt;code&gt;3d&lt;/code&gt;点，这个虚拟&lt;code&gt;3d&lt;/code&gt;点在坐标系原点真实&lt;code&gt;3d&lt;/code&gt;的直线上，因此真实点和虚拟点之间对应着一个相同的归一化坐标系下的点。这么构建有一个比较明显的优势，即针对&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;求导时，会变的比较简单。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h2 id="2"&gt;2. 求解模型雅可比&lt;/h2&gt;
+&lt;p&gt;现在，令&lt;span class="math"&gt;\(r_k=I_j(p')-\frac{t_je^{a_j}}{t_ie^{a_i}}I_i(p)+\frac{t_je^{a_j}}{t_ie^{a_i}}b_i-b_j\)&lt;/span&gt;，考虑使用&lt;code&gt;GN&lt;/code&gt;法或者&lt;code&gt;LM&lt;/code&gt;法求解这个优化问题，因此需要求解残差&lt;span class="math"&gt;\(r_k\)&lt;/span&gt;对待优化量的雅可比矩阵，后续无论是需要为优化模型添加核函数，或者是求解优化模型的海塞矩阵&lt;code&gt;H&lt;/code&gt;，都可以通过残差对待优化量的雅可比矩阵进行变换得到。&lt;/p&gt;
+&lt;h3 id="21"&gt;2.1 残差对位姿的雅可比矩阵&lt;/h3&gt;
+&lt;p&gt;根据链式求导法则，残差对位姿&lt;span class="math"&gt;\(T_{ji}\)&lt;/span&gt;的左侧扰动&lt;span class="math"&gt;\(\xi\)&lt;/span&gt;的雅可比矩阵&lt;span class="math"&gt;\(\frac{\partial{r_k}}{\partial{{\xi_{ji}}}}\)&lt;/span&gt;：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial{r_k}}{\partial{{\xi_{ji}}}} = \frac{\partial{r_k}}{\partial I_j} * \frac{\partial{I_j}}{\partial{p'}} * \frac{\partial{p'}}{\partial{P_{norm}'}} * \frac{\partial{P_{norm}'}}{\partial{P'}} * \frac{\partial{P'}}{\partial{\xi_{ji}}} 
+$$&lt;/div&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\frac{\partial{r_k}}{\partial I_j}\)&lt;/span&gt;，根据残差公式，可以看出来&lt;span class="math"&gt;\(\frac{\partial{r_k}}{\partial I_j}=1\)&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\frac{\partial{I_j}}{\partial{p'}}\)&lt;/span&gt;，可以定义为&lt;span class="math"&gt;\(p'\)&lt;/span&gt;在图像&lt;span class="math"&gt;\(I_j\)&lt;/span&gt;上的像素梯度，以&lt;span class="math"&gt;\([d_x,d_y]\)&lt;/span&gt;进行表示；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\frac{\partial{p'}}{\partial{P_{norm}'}}\)&lt;/span&gt;，这部分表示的是归一化坐标系到像素坐标系的投影过程，其雅可比矩阵可以使用如下公式进行表示；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial{p'}}{\partial{P_{norm}'}} = \begin{bmatrix}f_x&amp;amp;0\\0&amp;amp;f_y\end{bmatrix}
+$$&lt;/div&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;span class="math"&gt;\(\frac{\partial{P_{norm}'}}{\partial{P'}}\)&lt;/span&gt;，这部分表示的是虚拟点&lt;span class="math"&gt;\(P'\)&lt;/span&gt;到归一化坐标系的投影过程，根据公式不难推导出,其雅可比矩阵可以由下面的公式进行表示：
+&lt;div class="math"&gt;$$
+\frac{\partial{P_{norm}'}}{\partial{P'}} = 
+\begin{bmatrix}\frac{1}{P_Z'}&amp;amp;0&amp;amp;-\frac{P_X'}{P_Z'^2}\\0&amp;amp;\frac{1}{P_Z'}&amp;amp;-\frac{P_Y'}{P_Z'^2}\end{bmatrix}
+$$&lt;/div&gt;
+&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;span class="math"&gt;\(\frac{\partial{P'}}{\partial{\xi_{ji}}}\)&lt;/span&gt;，这部分表示的是虚拟&lt;code&gt;3d&lt;/code&gt;点位姿&lt;span class="math"&gt;\(T_{ji}\)&lt;/span&gt;左乘扰动&lt;span class="math"&gt;\(\xi_{ji}\)&lt;/span&gt;的雅可比矩阵，在视觉SLAM十四讲的中86页中推导过，这里只不过是针对虚拟点做了一些变换，可以得到&lt;span class="math"&gt;\(\frac{\partial{P'}}{\partial{\xi_{ji}}}=[d_{pi}I,-P'^{\wedge}]\)&lt;/span&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;综上，通过链式法则将5部分的雅可比矩阵相乘可得残差对&lt;span class="math"&gt;\(T_{ji}\)&lt;/span&gt;的左乘雅可比矩阵为:&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\begin{align*}
+    \frac{\partial{r_k}}{\partial{\xi_{ji}}}&amp;amp;=
+    \frac{1}{P_Z'} 
+    \begin{bmatrix} d_x&amp;amp;d_y \end{bmatrix} 
+    \begin{bmatrix} f_x &amp;amp; 0 \\ 0 &amp;amp; f_y \end{bmatrix}
+    \begin{bmatrix}
+        1 &amp;amp; 0 &amp;amp; -\frac{P_X'}{P_Z'} \\
+        0 &amp;amp; 1 &amp;amp; -\frac{P_Y'}{P_Z'} \\
+    \end{bmatrix}
+    \begin{bmatrix}
+        d_{pi}&amp;amp;-P'^{\wedge}
+    \end{bmatrix}\\ &amp;amp;=
+    \begin{bmatrix} d_xf_x&amp;amp;d_yf_y\end{bmatrix}
+    \begin{bmatrix}
+        \frac{d_{pi}}{P_{Z}'} &amp;amp; 0 &amp;amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{X}'}{P_{Z}'} &amp;amp; -\frac{P_{X}'P_{Y}'}{P_{Z}'^2} &amp;amp; 1+\frac{P_{X}^{2}}{P_{Z}^{2}} &amp;amp; -\frac{P_{Y}'}{P_{Z}'} 
+        \\
+        0 &amp;amp; \frac{d_{pi}}{P_{Z}'} &amp;amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{Y}'}{P_{Z}'} &amp;amp; -1-\frac{P_{Y}^{2}}{P_{Z}^{2}} &amp;amp; \frac{P_{X}'P_{Y}'}{P_{Z}^{2}} &amp;amp; \frac{P_{X}'}{P_{Z}'}
+    \end{bmatrix}
+\end{align*}
+$$&lt;/div&gt;
+&lt;h3 id="22-p_i"&gt;2.2 残差对&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;点逆深度的雅可比矩阵&lt;/h3&gt;
+&lt;p&gt;根据链式求导法则，残差对点的逆深度&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;的雅可比矩阵&lt;span class="math"&gt;\(\frac{\partial{r_k}}{\partial{{d_{pi}}}}\)&lt;/span&gt;：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial{r_k}}{\partial{{d_{pi}}}} = \frac{\partial{r_k}}{\partial I_j} * \frac{\partial{I_j}}{\partial{p'}} * \frac{\partial{p'}}{\partial{P_{norm}'}} * \frac{\partial{P_{norm}'}}{\partial{P'}} * \frac{\partial{P'}}{\partial{d_{pi}}} 
+$$&lt;/div&gt;
+&lt;p&gt;可以发现，残差对&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;点逆深度的链式求导的雅可比矩阵的前4部分都是相同的，因此只需要考虑&lt;span class="math"&gt;\(\frac{\partial{P'}}{\partial{d_{pi}}}\)&lt;/span&gt;这部分的雅可比即可，从公式中不难推导出：
+&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial{P'}}{\partial{d_{pi}}}=t_{ji}
+$$&lt;/div&gt;
+&lt;p&gt;综上，通过链式法则将5部分的雅可比矩阵相乘可得残差对&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;的雅可比矩阵为:&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\begin{align*}
+    \frac{\partial{r_k}}{\partial{\xi_{ji}}}&amp;amp;=
+    \frac{1}{P_Z'} 
+    \begin{bmatrix} d_x&amp;amp;d_y \end{bmatrix} 
+    \begin{bmatrix} f_x &amp;amp; 0 \\ 0 &amp;amp; f_y \end{bmatrix}
+    \begin{bmatrix}
+        1 &amp;amp; 0 &amp;amp; -\frac{P_X'}{P_Z'} \\
+        0 &amp;amp; 1 &amp;amp; -\frac{P_Y'}{P_Z'} \\
+    \end{bmatrix}
+    \begin{bmatrix}
+        t_{ji}^X\\t_{ji}^Y\\t_{ji}^Z
+    \end{bmatrix}\\ &amp;amp;=
+    \frac{1}{P_Z'}[d_xf_x(t_X^{ji}-\frac{P_X'}{P_Z'}t^Z_{ji})+d_yf_y(t_Y^{ji}-\frac{P_Y'}{P_Z'}t^Z_{ji})]
+\end{align*}
+$$&lt;/div&gt;
+&lt;h3 id="23"&gt;2.3 残差对光度仿射参数的雅可比矩阵&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;在不同的阶段对光度仿射参数做了不同程度的处理，其主要表现在初始化阶段、前端跟踪阶段和后端滑窗阶段。其中，初始化阶段和前端跟踪阶段主要注重相对仿射参数&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{ji}\)&lt;/span&gt;，而在后端滑窗优化阶段中则更加注重全局的仿射参数&lt;span class="math"&gt;\(a_j\)&lt;/span&gt;、&lt;span class="math"&gt;\(b_j\)&lt;/span&gt;、&lt;span class="math"&gt;\(a_i\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_i\)&lt;/span&gt;。&lt;/p&gt;
+&lt;p&gt;我打算分别在初始化、前端跟踪和后端滑窗优化三篇文章中单独对”&lt;code&gt;DSO&lt;/code&gt;对仿射参数处理”进行解析说明，在这篇文章中就不过多赘述了。&lt;/p&gt;
+&lt;h2 id="3"&gt;3. 模型在后端优化中的问题&lt;/h2&gt;
+&lt;p&gt;正如我在2.3小节中所描述的，&lt;code&gt;DSO&lt;/code&gt;的模型在后端优化中会产生一些问题，原因在于后端优化的参数量为全局量，而不是相对量。即是&lt;code&gt;global&lt;/code&gt;而非&lt;code&gt;local&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;其中在后端中需要特殊处理的参数主要有相对位姿&lt;span class="math"&gt;\(T_{ji}\)&lt;/span&gt;转变为绝对位姿&lt;span class="math"&gt;\(T_{jw}\)&lt;/span&gt;和&lt;span class="math"&gt;\(T_{iw}\)&lt;/span&gt;、相对光度仿射参数&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{ji}\)&lt;/span&gt;转变为全局光度仿射参数&lt;span class="math"&gt;\(a_j\)&lt;/span&gt;，&lt;span class="math"&gt;\(b_j\)&lt;/span&gt;，&lt;span class="math"&gt;\(a_i\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_i\)&lt;/span&gt;。&lt;/p&gt;
+&lt;p&gt;模型如何在后端优化中解决这个问题的说明，我会在&lt;code&gt;DSO&lt;/code&gt;滑窗优化后端中单独进行说明。&lt;/p&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;提前透漏&lt;/p&gt;
+&lt;p&gt;可以提前说明的是，在相对位姿转绝对位姿部分，&lt;code&gt;DSO&lt;/code&gt;使用的是位姿矩阵伴随的性质，而光度仿射参数的转换则采用的是雅可比矩阵中转变换的方法。&lt;/p&gt;
+&lt;/div&gt;
+&lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry><entry><title>DSO中的点选策略</title><link href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO" rel="alternate"></link><published>2025-01-14T00:00:00+08:00</published><updated>2025-01-14T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-14:/dso_ssl/Point-select-in-DSO</id><summary type="html">
 &lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;作为一个稀疏直接法，其中一个核心内容就是对图像上的部分点进行跟踪和&lt;strong&gt;逆深度&lt;/strong&gt;估计，既然是对图像上的某些点进 …&lt;/p&gt;</summary><content type="html">
 &lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;作为一个稀疏直接法，其中一个核心内容就是对图像上的部分点进行跟踪和&lt;strong&gt;逆深度&lt;/strong&gt;估计，既然是对图像上的某些点进行跟踪估计操作，那么肯定会涉及到如何在图像上选择点的操作，在整个&lt;code&gt;DSO&lt;/code&gt;的算法逻辑中，点选策略主要使用在两个阶段，一个是&lt;strong&gt;算法初始化阶段&lt;/strong&gt;，还有一个是&lt;strong&gt;创建关键帧阶段&lt;/strong&gt;。&lt;/p&gt;
 &lt;h2 id="1"&gt;1. 初始化阶段的点选策略&lt;/h2&gt;
