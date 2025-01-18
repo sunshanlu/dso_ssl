@@ -11,6 +11,7 @@ description: 本篇文章会介绍DSO是如何构建优化模型的，并且会�
 [TOC]
 
 在之前的[DSO中的去畸变操作](https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO)文章中，讲到`DSO`考虑了相机的成像过程对图像像素的影响：
+
 - 在有光度参数的条件下，`DSO`使用$G^{-1}(I)$非线性响应函数的逆过程和渐晕函数$V(x)$进行图像的光度去畸变操作，可以得到由能量单位组成的去光度畸变的图像。
 - 在没有光度参数的条件下，`DSO`使用仿射参数`a`和`b`来模拟光度参数的去畸变过程。
 - 在[DSO中的去畸变操作](https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO)文章中，也进行了讨论，即去畸变得到的像素能量并不能保证同一点的一致性，因为还没有考虑曝光时间的影响。

@@ -84,8 +84,8 @@ EXTRA_PATH_METADATA = dict()
 STATIC_PATHS.append("extra/robots.txt")
 EXTRA_PATH_METADATA["extra/robots.txt"] = {"path": "robots.txt"}
 
-STATIC_PATHS.append("theme/images/favicon.ico")
-EXTRA_PATH_METADATA["theme/images/favicon.ico"] = {"path": "favicon.ico"}
+# STATIC_PATHS.append("theme/images/favicon.ico")
+# EXTRA_PATH_METADATA["theme/images/favicon.ico"] = {"path": "favicon.ico"}
 
 DIRECT_TEMPLATES = ["index", "tags", "categories", "archives", "search", "404"]
 TAG_SAVE_AS = ""
