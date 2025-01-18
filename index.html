@@ -90,7 +90,7 @@
                 <p><code>DSO</code> 是 <code>vSLAM</code> 的一个重要的开源实现，它基于直接法，考虑了相机成像过程，使用光度标定或者仿射参数进行相机测量的直接矫正，使用相对高效的帧管理和点管理策略来维护整个滑动窗口。在优化阶段，使用自定义的优化器，充分使用了intel芯片的<code>SIMD</code>指令集来对整个优化过程进行加速。除此之外，它还制定了不同的策略，来防止解在零空间上的漂移，例如系统的正交投影、解的正交投影、SVD分解置零和固定初始帧的策略。除此之外，由于它的整个系统涉及到滑动窗口的点边缘化和帧边缘化，它使用部分<code>FEJ</code>的方式来防止这种边缘化的误操作行为导致的部分不客观的维度变得可观情况的发生。</p>
 <h2 id="dso">DSO的代码解读</h2>
 <p><img src="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-180x180.png" alt="RobotLU" style="float: right; margin-left: 10px; width: 150; height: 150;"></p>
-<p>我使用了一个多月的时间，完成了<code>DSO</code>的源码解读，我想使用记录的博客随机记录的方式对整个<code>DSO</code>的源码按照我的理解进行梳理。在这个博客随笔中，你可以从我的角度了解到 Direct和 Indirect的区别，Sparse 和 Dense的区别、<code>DSO</code>中的相机标定内容（畸变模型到pinhole模型的转换、光度去畸变）、<code>DSO</code>中的点选策略（像素点选择）、<code>DSO</code>考虑平移距离的初始化策略、<code>DSO</code>的跟踪策略、<code>DSO</code>的滑窗优化（涉及<code>FEJ</code>，local转global以及HM和bM的维护策略）。</p>
+<p>我使用了一个多月的时间，完成了<code>DSO</code>的源码解读，我想使用记录博客的方式对整个<code>DSO</code>的源码按照我的理解进行梳理。在这个博客随笔中，你可以从我的角度了解到 Direct和 Indirect的区别，Sparse 和 Dense的区别、<code>DSO</code>中的相机标定内容（畸变模型到pinhole模型的转换、光度去畸变）、<code>DSO</code>中的点选策略（像素点选择）、<code>DSO</code>考虑平移距离的初始化策略、<code>DSO</code>的跟踪策略、<code>DSO</code>的滑窗优化（涉及<code>FEJ</code>，local转global以及HM和bM的维护策略）。</p>
 <h2 id="dso_1">DSO的源码重写</h2>
 <p>我计划对整个<code>DSO</code>进行重写，重写的<code>DSO</code>源码应该比较符合我自己的代码风格，感兴趣的朋友可以关注我的DSO重写仓库：<a href="https://github.com/sunshanlu/dso_ssl">DSO_SSL</a>。</p>
 <h2 id="_1">相关链接</h2>
@@ -135,6 +135,16 @@
             <h1 id="recent-posts">Recent Posts <a id="allposts" href="https://sunshanlu.github.io/dso_ssl/archives">all posts</a></h1>
             </header>
         <div class="recent-posts">
+            <div itemscope class="recent-posts-article">
+                <a href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO">
+                    DSO中的初始化
+                </a>
+                <div class="recent-posts-posted">
+                    posted in
+                    <a href="https://sunshanlu.github.io/dso_ssl/categories#dso-ref">DSO</a>
+                    <time itemprop="dateCreated" datetime="2025-01-16T00:00:00+08:00">2025-01-16</time>
+                </div>
+            </div>
             <div itemscope class="recent-posts-article">
                 <a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">
                     DSO中的优化模型

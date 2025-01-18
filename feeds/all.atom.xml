@@ -1,7 +1,324 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/all.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-15T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的优化模型</title><link href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO" rel="alternate"></link><published>2025-01-15T00:00:00+08:00</published><updated>2025-01-15T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-15:/dso_ssl/Optimization-Model-DSO</id><summary type="html">
-&lt;p&gt;在之前的&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，讲到&lt;code&gt;DSO&lt;/code&gt;考虑了相机的成像过程对图像像素的影响：
-- 在有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用&lt;span class="math"&gt;\(G^{-1}(I)\)&lt;/span&gt;非线性响应 …&lt;/p&gt;&lt;script type='text/javascript'&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/all.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-16T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的初始化</title><link href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO" rel="alternate"></link><published>2025-01-16T00:00:00+08:00</published><updated>2025-01-16T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-16:/dso_ssl/Initialization-of-DSO</id><summary type="html">
+&lt;p&gt;在这篇文章中，我会对&lt;code&gt;DSO&lt;/code&gt;初始化的过程和初始化中的一些&lt;strong&gt;要点&lt;/strong&gt;进行讲解说明。作为一个单目视觉&lt;code&gt;VO&lt;/code&gt;系统，&lt;code&gt;DSO&lt;/code&gt;也采用了多帧 …&lt;/p&gt;</summary><content type="html">
+&lt;p&gt;在这篇文章中，我会对&lt;code&gt;DSO&lt;/code&gt;初始化的过程和初始化中的一些&lt;strong&gt;要点&lt;/strong&gt;进行讲解说明。作为一个单目视觉&lt;code&gt;VO&lt;/code&gt;系统，&lt;code&gt;DSO&lt;/code&gt;也采用了多帧初始化的策略，即首先在初始化参考帧上进行提点操作，然后根据不同的帧来优化初始化参考帧上点的逆深度估计，初始化的优化模型是在&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中提到的优化模型基础上，考虑了&lt;strong&gt;逆深度的连续性&lt;/strong&gt;和&lt;strong&gt;平移距离&lt;/strong&gt;构建的，并且使用了&lt;code&gt;Schur&lt;/code&gt;&lt;strong&gt;消元&lt;/strong&gt;来加速初始化中的优化过程。&lt;/p&gt;
+&lt;p&gt;在&lt;code&gt;DSO&lt;/code&gt;的初始化过程中还使用了图像金字塔（从粗到精的优化）来提高鲁棒性，并构建点的同层相邻点和上层父点之间的联系，实现点的逆深度传递。除此之外，&lt;code&gt;DSO&lt;/code&gt;在初始化过程中还对相对光度仿射参数进行了处理，下面是我对这些要点的详细说明：&lt;/p&gt;
+&lt;h2 id="1"&gt;1. 初始化中对仿射参数的处理&lt;/h2&gt;
+&lt;p&gt;我在&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中提到了&lt;code&gt;DSO&lt;/code&gt;的优化残差，可以使用下面的公式进行描述。&lt;/p&gt;
+&lt;div class="math"&gt;$$
+r_k = (I_j(p') - b_j) - \frac{t_je^{a_j}}{t_ie^{a_i}}(I_i(p) - b_i)
+$$&lt;/div&gt;
+&lt;p&gt;可以看到，公式中涉及到了参考帧&lt;span class="math"&gt;\(i\)&lt;/span&gt;待求解帧&lt;span class="math"&gt;\(j\)&lt;/span&gt;的绝对光度仿射参数，为了简化这部分对求导的影响，&lt;code&gt;DSO&lt;/code&gt;构造了相对仿射参数来代替绝对仿射参数，即令&lt;span class="math"&gt;\(e^{aji}=\frac{t_je^{a_j}}{t_ie^{a_i}}\)&lt;/span&gt;，&lt;span class="math"&gt;\(b_{ji}=b_j - a_{ji}b_i\)&lt;/span&gt;得公式(2)：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+r_k = I_j(p')-e^{a_{ji}}I_i(p)-b_{ji}
+$$&lt;/div&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;为什么不使用&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;而是使用&lt;span class="math"&gt;\(e^{a_{ji}}\)&lt;/span&gt;？&lt;/p&gt;
+&lt;p&gt;首先，如果使用&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;来代替&lt;span class="math"&gt;\(\frac{t_je^{a_j}}{t_ie^{a_i}}\)&lt;/span&gt;话，就会要求&lt;span class="math"&gt;\(a_{ji}&amp;gt;0\)&lt;/span&gt;的，因此模型会从原来的无约束优化问题变成了部分变量的有约束优化问题，会增加整个优化过程中的难度。因此为了避免这个问题，&lt;code&gt;DSO&lt;/code&gt;中使用了&lt;span class="math"&gt;\(e^{a_{ji}}\)&lt;/span&gt;来代替&lt;span class="math"&gt;\(\frac{t_je^{a_j}}{t_ie^{a_i}}\)&lt;/span&gt;而不是&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;。&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;为了解决这个优化问题，除了&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中求解的一些雅可比矩阵外，还需要求解残差对相对光度仿射参数的雅可比矩阵，从构建的残差公式中不难得到：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial r_k}{\partial a_{ji}} = e^{a_{ji}}I_i(p)\\
+\frac{\partial r_k}{\partial b_{ji}} = -1
+$$&lt;/div&gt;
+&lt;h2 id="2"&gt;2. 初始化优化模型中的惩罚项&lt;/h2&gt;
+&lt;p&gt;接下来，我们需要讨论的是，为什么&lt;code&gt;DSO&lt;/code&gt;在初始化过程中需要一个相对大并且准确估计的相对平移距离&lt;span class="math"&gt;\(t_{ji}\)&lt;/span&gt;。现在看下图的一个位姿估计过程，对比大平移距离&lt;span class="math"&gt;\(t_{ji}\)&lt;/span&gt;和小平移距离&lt;span class="math"&gt;\(t_{ji}\)&lt;/span&gt;的两张优化结果。可以发现，如果投影到&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧上的像素点存在1个像素的误差，大平移距离对应的点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;的深度变化可以由图像左侧的绿色大括号表示，而小平移距离对应的点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;的深度变化由右侧的绿色大括号表示。可以看出，小平移距离估计的点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;的深度受投影像素误差影响比较大。因此&lt;code&gt;DSO&lt;/code&gt;才会针对平移距离构建不同的优化目标函数，试图找到一个准确且足够大的&lt;span class="math"&gt;\(t_{ji}\)&lt;/span&gt;，来保证初始化参考帧上的点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;逆深度的稳定性和准确性。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/triangulation.png" width="70%"/&gt;
+&lt;/div&gt;
+&lt;h3 id="21"&gt;2.1 平移距离不足时的惩罚项&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;在初始化过程中还考虑了平移距离和逆深度连续性的影响，&lt;code&gt;DSO&lt;/code&gt;认为在初始化过程中，
+输入的普通帧&lt;span class="math"&gt;\(j\)&lt;/span&gt;和初始化参考帧&lt;span class="math"&gt;\(i\)&lt;/span&gt;的平移距离应该达到某个阈值才认为&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧对参考帧上点逆深度起作用，为了确保在优化过程中得到的相对平移距离足够可靠，&lt;code&gt;DSO&lt;/code&gt;在未达到足够的平移距离之前，会对平移距离添加惩罚项，除此之外还会对点的逆深度做一个尺度约束，因此在平移距离不够的条件下，&lt;code&gt;DSO&lt;/code&gt;构造的优化目标函数如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_f=\sum_{p_i\in R_f}{\sum_{p\in \mathcal{N}_i(p_i)}{||I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}||_{\gamma}}}+E_l\\
+E_l=\frac{\alpha_W}{2} \sum_{p_i\in R_f}{((d_{pi}-1)^2+||t_{ji}||^2_2)}
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_f\)&lt;/span&gt;部分为平移量不足条件下的优化目标函数；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_l\)&lt;/span&gt;部分包含了逆深度尺度惩罚项&lt;span class="math"&gt;\((d_{pi} - 1)^2\)&lt;/span&gt;和相对平距离的惩罚项&lt;span class="math"&gt;\(||t_{ji}||^2_2\)&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\alpha_W\)&lt;/span&gt;代表调节正则化项部分的超参数，从而在一定程度上改变优化的侧重方向；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(R_f\)&lt;/span&gt;代表是初始化参考帧&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;针对&lt;span class="math"&gt;\(E_l\)&lt;/span&gt;的惩罚项部分，&lt;span class="math"&gt;\(E_l^{p_j}\)&lt;/span&gt;的整个组成部分相对简单，可以直接求解惩罚项的雅可比矩阵&lt;span class="math"&gt;\(J_l\)&lt;/span&gt;和海塞矩阵&lt;span class="math"&gt;\(H_l\)&lt;/span&gt;，而不必使用高斯牛顿法利用残差项的雅可比变换得到：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial E_l^{p_j}}{\partial x} = J_{p_i}=\begin{bmatrix}
+    t_{ji}^T &amp;amp; 0_{1 \times 3} &amp;amp; 0 &amp;amp; 0 &amp;amp; d_{pi}-1
+\end{bmatrix}
+\\
+\frac{\partial^2 E_l^{p_j}}{\partial x^2} = H_{pi}=
+\begin{bmatrix}
+    \begin{bmatrix}
+        I_{3\times 3} &amp;amp; \mathbf{0_{3\times3}}\\
+        \mathbf{0_{3\times3}} &amp;amp; \mathbf{0_{3\times3}}
+    \end{bmatrix} &amp;amp; \mathbf{0_{6 \times 1}} &amp;amp; \mathbf{0_{6 \times 1}} &amp;amp; \mathbf{0_{6 \times 1}}\\
+    \mathbf{0_{1 \times 6}} &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 \\
+    \mathbf{0_{1 \times 6}} &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 \\
+    \mathbf{0_{1 \times 6}} &amp;amp; 0 &amp;amp; 0 &amp;amp; 1 \\
+\end{bmatrix} 
+$$&lt;/div&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;&lt;span class="math"&gt;\(E_l^{p_j}\)&lt;/span&gt;和&lt;span class="math"&gt;\(E_l\)&lt;/span&gt;的区别&lt;/p&gt;
+&lt;p&gt;值得注意的是，&lt;span class="math"&gt;\(E_l^{p_j}\)&lt;/span&gt;的能量值，代表是初始化参考关键帧&lt;span class="math"&gt;\(R_f\)&lt;/span&gt;上的点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;向&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;部分投影这一约束贡献的系统能量值，或者说是贡献的优化目标函数值。惩罚项的海塞矩阵&lt;span class="math"&gt;\(H_l\)&lt;/span&gt;可以由所有的&lt;span class="math"&gt;\(H_l^{p_j}\)&lt;/span&gt;组合而成，即相同的约束部分可以加和，而不用的约束部分需要拓展组成一个大矩阵&lt;span class="math"&gt;\(H_l\)&lt;/span&gt;，当然，雅可比矩阵也是如此。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h3 id="22"&gt;2.2 平移距离足够时的惩罚项&lt;/h3&gt;
+&lt;p&gt;当平移距离足够时，&lt;code&gt;DSO&lt;/code&gt;认为初始化参考帧&lt;span class="math"&gt;\(i\)&lt;/span&gt;中的像素点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;的逆深度会有一个相对稳定、准确且尺度一致（因为使用了&lt;span class="math"&gt;\((d_{pi}-1)^2\)&lt;/span&gt;作为尺度惩罚项）的值，这时，&lt;code&gt;DSO&lt;/code&gt;会去掉对平移距离的惩罚项，同时对逆深度进行期望约束，这里的期望值&lt;span class="math"&gt;\(iR\)&lt;/span&gt;考虑了当前点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;和周围点的逆深度关系，即逆深度的平滑性，得到的优化目标函数如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_f=\sum_{p_i\in R_f}{\sum_{p\in \mathcal{N}_i(p_i)}{||I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}||_{\gamma}}}+E_l\\
+E_l=\frac{\alpha}{2} \sum_{p_i\in R_f}{(d_{pi}-iR_{i})^2}
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_f\)&lt;/span&gt;部分为平移量足够条件下的优化目标函数；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_l\)&lt;/span&gt;部分包含了逆深度期望惩罚项&lt;span class="math"&gt;\((d_{pi} - iR_i)^2\)&lt;/span&gt;，充分考虑了周围点逆深度的平滑性；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\alpha\)&lt;/span&gt;代表调节正则化项部分的超参数，从而在一定程度上改变优化的侧重方向；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;针对&lt;span class="math"&gt;\(E_l\)&lt;/span&gt;的惩罚项部分，求得其雅可比矩阵和海塞矩阵如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial{E_l^{p_j}}}{\partial{x}}=J_l^{p_j}=
+\begin{bmatrix}
+    \mathbf{0_{1\times6}} &amp;amp; 0 &amp;amp; 0 &amp;amp; d_{pi}-iR
+\end{bmatrix}
+\\
+\frac{\partial^2{E_l^{p_j}}}{\partial{x^2}} = H_l^{p_j} = 
+\begin{bmatrix}
+    \mathbf{0_{6\times6}} &amp;amp; \mathbf{0_{6 \times 1}} &amp;amp; \mathbf{0_{6 \times 1}} &amp;amp; \mathbf{0_{6 \times 1}}\\
+    \mathbf{0_{1\times6}} &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 \\
+    \mathbf{0_{1\times6}} &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 \\
+    \mathbf{0_{1\times6}} &amp;amp; 0 &amp;amp; 0 &amp;amp; 1 \\
+\end{bmatrix}
+$$&lt;/div&gt;
+&lt;h2 id="3"&gt;3. 基于金字塔的逆深度传递&lt;/h2&gt;
+&lt;p&gt;为了能够方便的表述逆深度传递的重要性，在这部分我会先在3.1小节中梳理一下&lt;code&gt;DSO&lt;/code&gt;&lt;strong&gt;初始化流程&lt;/strong&gt;，然后在3.2小节中重点讲解基于金字塔和相邻点的&lt;strong&gt;逆深度传递过程&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id="31-dso"&gt;3.1 DSO初始化过程&lt;/h3&gt;
+&lt;p&gt;下图中，使用虚线框标注出来的部分是&lt;code&gt;DSO&lt;/code&gt;初始化器的主要工作流程，值得注意的是，在&lt;a href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO"&gt;初始化点选之后&lt;/a&gt;，参考帧&lt;span class="math"&gt;\(R_f\)&lt;/span&gt;上会得到点&lt;span class="math"&gt;\(p_i\in R_f\)&lt;/span&gt;，这些点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;会分布在不同的金字塔层级上，为了方便后续这些点的逆深度传递，&lt;code&gt;DSO&lt;/code&gt;构造了这些点的&lt;strong&gt;同层相邻点&lt;/strong&gt;和&lt;strong&gt;上层父点&lt;/strong&gt;之间的关系。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img alt="init-process" src="https://sunshanlu.github.io/dso_ssl/images/init-process.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;h3 id="32"&gt;3.2 逆深度传递&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的初始化器构造了同层相邻点和上层父点之间的关系，这样会比较方便的执行下面的三种操作：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;从上层到下层优化过程中，上层父点会向下层子点提供&lt;strong&gt;逆深度初值&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;当优化完成后，下层子点会将充分优化的逆深度初值向上层父点传递，以&lt;strong&gt;修正父点逆深度值&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;由于&lt;code&gt;DSO&lt;/code&gt;初始化器在优化目标函数构建中，考虑了相邻点逆深度连续性，这部分连续性的考虑是由相邻点关系实现的。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在每一步优化结束后，&lt;code&gt;DSO&lt;/code&gt;初始化器会更新逆深度值，同样会更新逆深度期望值，期望值的更新考虑了相邻点之间的连续性关系，下面的公式描述了逆深度期望的更新策略：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+iR_i=(1-\beta)\times{d_{pi}}_{new}+\beta\times{iR_{mid}^i}\\
+iR_{mid}^i={Median}(neighbors(p_i))
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(iR_i\)&lt;/span&gt;为点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;逆深度的更新期望；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\({d_{pi}}_{new}\)&lt;/span&gt;为点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;逆深度的优化更新值；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\beta\)&lt;/span&gt;为相邻点逆深度连续性置信度，在源码为&lt;code&gt;0.8&lt;/code&gt;；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(iR_{mid}^i\)&lt;/span&gt;为点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;邻居的逆深度期望中值；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;初始化器使用同层金字塔&lt;code&gt;K&lt;/code&gt;近邻的方式构建同层点和邻居点之间的关系，使用向上层金字塔投影寻找最近邻的方式构建与上层父点之间的关系。&lt;/p&gt;
+&lt;h3 id="33"&gt;3.3 高斯归一化积&lt;/h3&gt;
+&lt;p&gt;考虑父点向子点传递逆深度过程：除了第一次优化过程外，子点都会有一个&lt;strong&gt;相对有效&lt;/strong&gt;的逆深度优化值，这时父点还会向子点提供一个逆深度。&lt;code&gt;DSO&lt;/code&gt;初始化器使用了高斯归一化来耦合这两个逆深度值，&lt;strong&gt;高斯归一化积&lt;/strong&gt;的数学描述如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\mu_{c} H_{c}=\sum_{i=0}^N \mu_iH_i\\
+H_c=\sum_{i=0}^N H_i
+$$&lt;/div&gt;
+&lt;p&gt;父点向子点传递时，子点不仅仅是逆深度值&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;发生了改变，子点的逆深度期望&lt;span class="math"&gt;\(iR\)&lt;/span&gt;同样发生了改变，这个传递过程可以由下面的流程图进行描述：&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img alt="up-down" src="https://sunshanlu.github.io/dso_ssl/images/up-down.png" width="100%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;3.2中的公式同样描述了，流程图中的&lt;strong&gt;考虑相邻点&lt;span class="math"&gt;\(iR\)&lt;/span&gt;的连续性&lt;/strong&gt;操作。通过这样的操作，可以人为的构造出一个考虑了连续性影响的逆深度期望值出来，从而能够完成后续初始化优化目标函数（会涉及点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;的逆深度期望&lt;span class="math"&gt;\(iR_i\)&lt;/span&gt;）的构建。&lt;/p&gt;
+&lt;p&gt;考虑子点向父点的逆深度传递过程：在3.2小节的描述中，父子点之间的关系构造是通过投影和最近邻实现，因此可能会出现一个父点对应多个子点的情况，这时又会出现多个逆深度值同时出现的问题，&lt;code&gt;DSO&lt;/code&gt;仍然是通过高斯归一化积来解决这个问题，下面的流程图描述了具体的传递过程：&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img alt="down-up" src="https://sunshanlu.github.io/dso_ssl/images/down-up.png" width="100%"/&gt;
+&lt;/div&gt;
+&lt;h2 id="4-schur"&gt;4. 初始化器的Schur优化加速&lt;/h2&gt;
+&lt;p&gt;这里我打算以&lt;span class="math"&gt;\(t_{ji}\)&lt;/span&gt;不足条件下的优化加速为例，初始化中&lt;span class="math"&gt;\(t_{ji}\)&lt;/span&gt;不足时的优化目标函数如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_f=\sum_{p_i\in R_f}{\sum_{p\in \mathcal{N}_i(p_i)}{||I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}||_{\gamma}}}+E_l\\
+E_l=\alpha \sum_{p_i\in R_f}{(d_{pi}-iR_{i})^2}
+$$&lt;/div&gt;
+&lt;p&gt;首先，考虑非惩罚部分&lt;span class="math"&gt;\(E_{nl}=E_f-E_l\)&lt;/span&gt;，这部分能量的残差为&lt;span class="math"&gt;\(r_k^{nl}=I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}\)&lt;/span&gt;，那么根据高斯牛顿法，在&lt;strong&gt;不考虑&lt;code&gt;Huber&lt;/code&gt;核函数&lt;/strong&gt;的情况下，可以构建优化方程：&lt;/p&gt;
+&lt;div class="math"&gt;$$ 
+\begin{align*}
+    H_{nl}^{p_j} &amp;amp; =\sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{x}})^T(\frac{\partial{r_k^{nl}}}{\partial{x}})} \\ &amp;amp; =
+    \begin{bmatrix}
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T (\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T (\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T (\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})} \\
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}}} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})} \\
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})}&amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})}&amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})}&amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})} \\
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})} &amp;amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})}
+    \end{bmatrix}
+\end{align*}
+$$&lt;/div&gt;
+&lt;div class="math"&gt;$$
+b_{nl}^{p_j}=-\sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{x}})^T \times r_k^{nl}}\quad=
+-\begin{bmatrix}
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T \times r_k^{nl}} \\
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T \times r_k^{nl}} \\
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T \times r_k^{nl}} \\
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T \times r_k^{nl}}
+\end{bmatrix}
+$$&lt;/div&gt;
+&lt;div class="math"&gt;$$
+H_{nl}=
+\begin{bmatrix}
+    \sum_{p_i \in R_f}{U_{p_j}} &amp;amp; W^{p_0} &amp;amp; W_{p_1} &amp;amp; ... &amp;amp; W_{p_m} \\
+    W_{p_0} &amp;amp; V_{p_0} \\
+    W_{p_1} &amp;amp; &amp;amp; V_{p_1}\\
+    ... &amp;amp; &amp;amp; &amp;amp; ... \\ 
+    W_{p_m} &amp;amp; &amp;amp; &amp;amp; &amp;amp; V_{p_m}\\
+\end{bmatrix}
+\quad
+b_{nl}=
+-\begin{bmatrix}
+    \sum_{p_i \in R_f}{b_{U}} \\
+    b_{V_{p_0}} \\ 
+    b_{V_{p_1}} \\ 
+    ... \\
+    b_{V_{p_m}} \\ 
+\end{bmatrix}
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}}\)&lt;/span&gt;的计算公式在&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中推导过；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}}\)&lt;/span&gt;的计算公式在本篇文章的第一小节中推导过；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(H_{nl}^{pj}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{nl}^{p_j}\)&lt;/span&gt;，为某个点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;投影到&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;这部分的优化约束；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(H_{nl}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{nl}\)&lt;/span&gt;，为不含惩罚项部分的能量函数总约束，我使用了分块矩阵进行表示，这么做比较方便，矩阵分块结构图如下：&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div align="center"&gt;
+&lt;img alt="mat-block" src="https://sunshanlu.github.io/dso_ssl/images/mat-block.png" width="100%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;对惩罚项部分，根据文章的第2小节推导的公式，考虑超参数&lt;span class="math"&gt;\(\alpha_W\)&lt;/span&gt;，并使用上图中的分块方式，可以得到惩罚项部分的优化约束矩阵：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+H_l= \alpha_W
+\begin{bmatrix}
+    \sum_{p_i \in R_f}{\begin{bmatrix}
+        I_{3\times 3} &amp;amp; \mathbf{0_{3\times3}} &amp;amp; \mathbf{0_{3 \times 1}} &amp;amp; \mathbf{0_{3 \times 1}}\\ 
+        \mathbf{0_{3\times3}} &amp;amp; \mathbf{0_{3\times3}} &amp;amp; \mathbf{0_{3 \times 1}} &amp;amp; \mathbf{0_{3 \times 1}}\\ 
+        \mathbf{0_{1\times3}} &amp;amp; \mathbf{0_{1\times3}} &amp;amp; 0 &amp;amp; 0\\ 
+        \mathbf{0_{1\times3}} &amp;amp; \mathbf{0_{1\times3}} &amp;amp; 0 &amp;amp; 0\\ 
+    \end{bmatrix}} &amp;amp; \mathbf{0_{8\times1}} &amp;amp; \mathbf{0_{8\times1}} &amp;amp; ... &amp;amp; \mathbf{0_{8\times1}}\\
+    \mathbf{0_{1\times8}} &amp;amp; 1\\
+    \mathbf{0_{1\times8}} &amp;amp; &amp;amp; 1\\
+    ... &amp;amp; &amp;amp; &amp;amp;...\\
+    \mathbf{0_{1\times8}} &amp;amp; &amp;amp; &amp;amp; &amp;amp; 1\\
+\end{bmatrix} 
+\\
+b_l = -\alpha_W 
+\begin{bmatrix}
+    \begin{bmatrix}t_{ji}\\ \mathbf{0_{3\times1}} \\0\\0\end{bmatrix}\\d_{p0}-1\\d_{p1}-1\\...\\d_{pm}-1
+\end{bmatrix}
+$$&lt;/div&gt;
+&lt;p&gt;因此整个系统的优化约束为：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+H=H_{nl}+H_{l}=
+\begin{bmatrix}
+    \sum_{p_i \in R_f}{U_{p_j}'} &amp;amp; W^{p_0} &amp;amp; W_{p_1} &amp;amp; ... &amp;amp; W_{p_m} \\
+    W_{p_0} &amp;amp; V_{p_0}+\alpha_W \\
+    W_{p_1} &amp;amp; &amp;amp; V_{p_1}+\alpha_W \\
+    ... &amp;amp; &amp;amp; &amp;amp; ... \\ 
+    W_{p_m} &amp;amp; &amp;amp; &amp;amp; &amp;amp; V_{p_m}+\alpha_W \\
+\end{bmatrix}
+\quad
+b=b_{nl}+b_l=
+-\begin{bmatrix}
+    \sum_{p_i \in R_f}{b_{U}'} \\
+    b_{V_{p_0}} + \alpha_W(d_{p_0} - 1) \\ 
+    b_{V_{p_1}} + \alpha_W(d_{p_1} - 1) \\ 
+    ... \\
+    b_{V_{p_m}} + \alpha_W(d_{p_m} - 1) \\ 
+\end{bmatrix}
+\\
+U_{p_j}'=U_{p_j} + \alpha_W
+\begin{bmatrix}
+    I_{3\times 3} &amp;amp; \mathbf{0_{3\times3}} &amp;amp; \mathbf{0_{3 \times 1}} &amp;amp; \mathbf{0_{3 \times 1}}\\ 
+    \mathbf{0_{3\times3}} &amp;amp; \mathbf{0_{3\times3}} &amp;amp; \mathbf{0_{3 \times 1}} &amp;amp; \mathbf{0_{3 \times 1}}\\ 
+    \mathbf{0_{1\times3}} &amp;amp; \mathbf{0_{1\times3}} &amp;amp; 0 &amp;amp; 0\\ 
+    \mathbf{0_{1\times3}} &amp;amp; \mathbf{0_{1\times3}} &amp;amp; 0 &amp;amp; 0\\ 
+\end{bmatrix}
+\quad
+b_{U}'=b_{U} + \alpha_W \begin{bmatrix}t_{ji}\\ \mathbf{0_{3\times1}} \\0\\0\end{bmatrix}
+$$&lt;/div&gt;
+&lt;p&gt;最后，根据SLAM十四讲&lt;code&gt;p249&lt;/code&gt;页描述的&lt;code&gt;Schur&lt;/code&gt;分解公式，先将涉及逆深度部分分解掉，求解相对位姿和相对仿射参数的增量，然后将相对位姿增量和相对仿射参数增量再次带入涉及逆深度方程的部分，求解得到逆深度增量即可。&lt;/p&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;大矩阵&lt;code&gt;Schur&lt;/code&gt;和小矩阵&lt;code&gt;Schur&lt;/code&gt;&lt;/p&gt;
+&lt;p&gt;在上面的推导中，初始化器总优化约束的&lt;span class="math"&gt;\(H\)&lt;/span&gt;矩阵和&lt;span class="math"&gt;\(b\)&lt;/span&gt;矩阵由所有投影关系&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;-&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;的优化约束&lt;span class="math"&gt;\(H_{p_j}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{p_j}\)&lt;/span&gt;得到。同样不难证明，大矩阵&lt;span class="math"&gt;\(H\)&lt;/span&gt;和&lt;span class="math"&gt;\(b\)&lt;/span&gt;进行&lt;code&gt;Schur&lt;/code&gt;分解和所有小矩阵&lt;span class="math"&gt;\(H_{p_j}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{p_j}\)&lt;/span&gt;分别&lt;code&gt;Schur&lt;/code&gt;分解然后组合拼接（这里直接累加即可，因为分解后的矩阵的约束变量是相同的）的效果是一样的。&lt;code&gt;DSO&lt;/code&gt;的源码里面也利用了这个结论，从而避免了大稀疏矩阵构建导致的高空间复杂度问题。&lt;/p&gt;
+&lt;/div&gt;
+&lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry><entry><title>DSO中的优化模型</title><link href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO" rel="alternate"></link><published>2025-01-15T00:00:00+08:00</published><updated>2025-01-15T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-15:/dso_ssl/Optimization-Model-DSO</id><summary type="html">
+&lt;p&gt;在之前的&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，讲到&lt;code&gt;DSO&lt;/code&gt;考虑了相机的成像过程对图像像素的影响：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;在有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用&lt;span class="math"&gt;\(G^{-1}(I)\)&lt;/span&gt;非线性响应 …&lt;/li&gt;&lt;/ul&gt;&lt;script type='text/javascript'&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
     var align = "center",
         indent = "0em",
         linebreak = "false";
@@ -63,10 +380,12 @@
     (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
 }
 &lt;/script&gt;</summary><content type="html">
-&lt;p&gt;在之前的&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，讲到&lt;code&gt;DSO&lt;/code&gt;考虑了相机的成像过程对图像像素的影响：
-- 在有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用&lt;span class="math"&gt;\(G^{-1}(I)\)&lt;/span&gt;非线性响应函数的逆过程和渐晕函数&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;进行图像的光度去畸变操作，可以得到由能量单位组成的去光度畸变的图像。
-- 在没有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用仿射参数&lt;code&gt;a&lt;/code&gt;和&lt;code&gt;b&lt;/code&gt;来模拟光度参数的去畸变过程。
-- 在&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，也进行了讨论，即去畸变得到的像素能量并不能保证同一点的一致性，因为还没有考虑曝光时间的影响。&lt;/p&gt;
+&lt;p&gt;在之前的&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，讲到&lt;code&gt;DSO&lt;/code&gt;考虑了相机的成像过程对图像像素的影响：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;在有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用&lt;span class="math"&gt;\(G^{-1}(I)\)&lt;/span&gt;非线性响应函数的逆过程和渐晕函数&lt;span class="math"&gt;\(V(x)\)&lt;/span&gt;进行图像的光度去畸变操作，可以得到由能量单位组成的去光度畸变的图像。&lt;/li&gt;
+&lt;li&gt;在没有光度参数的条件下，&lt;code&gt;DSO&lt;/code&gt;使用仿射参数&lt;code&gt;a&lt;/code&gt;和&lt;code&gt;b&lt;/code&gt;来模拟光度参数的去畸变过程。&lt;/li&gt;
+&lt;li&gt;在&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;文章中，也进行了讨论，即去畸变得到的像素能量并不能保证同一点的一致性，因为还没有考虑曝光时间的影响。&lt;/li&gt;
+&lt;/ul&gt;
 &lt;h2 id="1"&gt;1. 构建优化模型&lt;/h2&gt;
 &lt;p&gt;SLAM十四讲中提到，直接法会直接使用像素的灰度值，构建优化模型的残差，其公式表示为&lt;span class="math"&gt;\(r_k=I_i(p_i)-I_j(p_j)\)&lt;/span&gt;。由于&lt;code&gt;DSO&lt;/code&gt;引入了仿射参数去光度畸变的操作，同时考虑了曝光时间对其一致性的影响，构建的残差应该为：&lt;/p&gt;
 &lt;div class="math"&gt;$$

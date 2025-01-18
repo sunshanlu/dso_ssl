@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" type="text/css" href="https://sunshanlu.github.io/dso_ssl/theme/css/elegant.prod.9e9d5ce754.css" media="screen">
+        <link rel="stylesheet" type="text/css" href="https://sunshanlu.github.io/dso_ssl/theme/css/custom.css" media="screen">
+
+        <link rel="dns-prefetch" href="//fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com/" crossorigin>
+
+        <meta name="google-site-verification" content="UpDPegqFb_TnOIJbDp5ud8wVncaUoUB-fJoQyiiAdmg" />        <meta name="msvalidate.01" content="A86784EE624E2187E0AC969B764CE1E1" />        <meta name="author" content="孙善路-github" />
+
+        <meta name="description" content="在这篇文章中，我会对DSO初始化的过程和初始化中的一些要点进行讲解说明。作为一个单目视觉VO系统，DSO也采用了多帧 …
+" />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:card" content="summary">
+
+<meta name="keywords" content="vSLAM, DSO, Robot, DSO, " />
+
+<meta property="og:title" content="DSO中的初始化 "/>
+<meta property="og:url" content="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO" />
+<meta property="og:description" content="在这篇文章中，我会对DSO初始化的过程和初始化中的一些要点进行讲解说明。作为一个单目视觉VO系统，DSO也采用了多帧 …" />
+<meta property="og:site_name" content="SSL的SLAM系列 - DSO" />
+<meta property="og:article:author" content="孙善路-github" />
+<meta property="og:article:published_time" content="2025-01-16T00:00:00+08:00" />
+<meta name="twitter:title" content="DSO中的初始化 ">
+<meta name="twitter:description" content="在这篇文章中，我会对DSO初始化的过程和初始化中的一些要点进行讲解说明。作为一个单目视觉VO系统，DSO也采用了多帧 …">
+
+        <title>DSO中的初始化  · SSL的SLAM系列 - DSO
+</title>
+        <link rel="shortcut icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/favicon.ico" type="image/x-icon" />
+        <link rel="icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-152x152.png" type="image/png" />
+        <link rel="apple-touch-icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon.png"  type="image/png" />
+        <link rel="apple-touch-icon" sizes="57x57" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-57x57.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="72x72" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-72x72.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="76x76" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-76x76.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="114x114" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-114x114.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="120x120" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-120x120.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="144x144" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-144x144.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-152x152.png" type="image/png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-180x180.png" type="image/png" />
+        <link href="https://sunshanlu.github.io/dso_ssl/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="SSL的SLAM系列 - DSO - Full Atom Feed" />
+
+
+
+        <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+    </head>
+    <body>
+        <div id="content">
+            <div class="navbar navbar-static-top">
+                <div class="navbar-inner">
+                    <div class="container-fluid">
+                        <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                            <span class="icon-bar"></span>
+                        </a>
+                        <a class="brand" href="https://sunshanlu.github.io/dso_ssl/"><span class=site-name>SSL的SLAM系列 - DSO</span></a>
+                        <div class="nav-collapse collapse">
+                            <ul class="nav pull-right top-menu">
+                                <li >
+                                    <a href=
+                                       https://sunshanlu.github.io/dso_ssl
+                                    >Home</a>
+                                </li>
+                                <li ><a href="https://sunshanlu.github.io/dso_ssl/categories">Categories</a></li>
+                                <li ><a href="https://sunshanlu.github.io/dso_ssl/tags">Tags</a></li>
+                                <li ><a href="https://sunshanlu.github.io/dso_ssl/archives">Archives</a></li>
+                                <li><form class="navbar-search" action="https://sunshanlu.github.io/dso_ssl/search" onsubmit="return validateForm(this.elements['q'].value);"> <input type="text" class="search-query" placeholder="Search" name="q" id="tipue_search_input"></form></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="container-fluid">
+                <div class="row-fluid">
+                    <div class="span1"></div>
+                    <div class="span10">
+<article itemscope>
+<div class="row-fluid">
+    <header class="page-header span10 offset2">
+        <h1>
+            <a href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO">
+                DSO中的初始化
+            </a>
+        </h1>
+    </header>
+</div>
+
+<div class="row-fluid">
+    <div class="span2 table-of-content">
+        <nav>
+        <h4>Contents</h4>
+        <div class="toc">
+<ul>
+<li><a href="#1">1. 初始化中对仿射参数的处理</a></li>
+<li><a href="#2">2. 初始化优化模型中的惩罚项</a><ul>
+<li><a href="#21">2.1 平移距离不足时的惩罚项</a></li>
+<li><a href="#22">2.2 平移距离足够时的惩罚项</a></li>
+</ul>
+</li>
+<li><a href="#3">3. 基于金字塔的逆深度传递</a><ul>
+<li><a href="#31-dso">3.1 DSO初始化过程</a></li>
+<li><a href="#32">3.2 逆深度传递</a></li>
+<li><a href="#33">3.3 高斯归一化积</a></li>
+</ul>
+</li>
+<li><a href="#4-schur">4. 初始化器的Schur优化加速</a></li>
+</ul>
+</div>
+        </nav>
+    </div>
+    <div class="span8 article-content">
+            
+            
+<p>在这篇文章中，我会对<code>DSO</code>初始化的过程和初始化中的一些<strong>要点</strong>进行讲解说明。作为一个单目视觉<code>VO</code>系统，<code>DSO</code>也采用了多帧初始化的策略，即首先在初始化参考帧上进行提点操作，然后根据不同的帧来优化初始化参考帧上点的逆深度估计，初始化的优化模型是在<a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">DSO中的优化模型</a>文章中提到的优化模型基础上，考虑了<strong>逆深度的连续性</strong>和<strong>平移距离</strong>构建的，并且使用了<code>Schur</code><strong>消元</strong>来加速初始化中的优化过程。</p>
+<p>在<code>DSO</code>的初始化过程中还使用了图像金字塔（从粗到精的优化）来提高鲁棒性，并构建点的同层相邻点和上层父点之间的联系，实现点的逆深度传递。除此之外，<code>DSO</code>在初始化过程中还对相对光度仿射参数进行了处理，下面是我对这些要点的详细说明：</p>
+<h2 id="1">1. 初始化中对仿射参数的处理</h2>
+<p>我在<a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">DSO中的优化模型</a>文章中提到了<code>DSO</code>的优化残差，可以使用下面的公式进行描述。</p>
+<div class="math">$$
+r_k = (I_j(p') - b_j) - \frac{t_je^{a_j}}{t_ie^{a_i}}(I_i(p) - b_i)
+$$</div>
+<p>可以看到，公式中涉及到了参考帧<span class="math">\(i\)</span>待求解帧<span class="math">\(j\)</span>的绝对光度仿射参数，为了简化这部分对求导的影响，<code>DSO</code>构造了相对仿射参数来代替绝对仿射参数，即令<span class="math">\(e^{aji}=\frac{t_je^{a_j}}{t_ie^{a_i}}\)</span>，<span class="math">\(b_{ji}=b_j - a_{ji}b_i\)</span>得公式(2)：</p>
+<div class="math">$$
+r_k = I_j(p')-e^{a_{ji}}I_i(p)-b_{ji}
+$$</div>
+<div class="admonition note">
+<p class="admonition-title">为什么不使用<span class="math">\(a_{ji}\)</span>而是使用<span class="math">\(e^{a_{ji}}\)</span>？</p>
+<p>首先，如果使用<span class="math">\(a_{ji}\)</span>来代替<span class="math">\(\frac{t_je^{a_j}}{t_ie^{a_i}}\)</span>话，就会要求<span class="math">\(a_{ji}&gt;0\)</span>的，因此模型会从原来的无约束优化问题变成了部分变量的有约束优化问题，会增加整个优化过程中的难度。因此为了避免这个问题，<code>DSO</code>中使用了<span class="math">\(e^{a_{ji}}\)</span>来代替<span class="math">\(\frac{t_je^{a_j}}{t_ie^{a_i}}\)</span>而不是<span class="math">\(a_{ji}\)</span>。</p>
+</div>
+<p>为了解决这个优化问题，除了<a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">DSO中的优化模型</a>文章中求解的一些雅可比矩阵外，还需要求解残差对相对光度仿射参数的雅可比矩阵，从构建的残差公式中不难得到：</p>
+<div class="math">$$
+\frac{\partial r_k}{\partial a_{ji}} = e^{a_{ji}}I_i(p)\\
+\frac{\partial r_k}{\partial b_{ji}} = -1
+$$</div>
+<h2 id="2">2. 初始化优化模型中的惩罚项</h2>
+<p>接下来，我们需要讨论的是，为什么<code>DSO</code>在初始化过程中需要一个相对大并且准确估计的相对平移距离<span class="math">\(t_{ji}\)</span>。现在看下图的一个位姿估计过程，对比大平移距离<span class="math">\(t_{ji}\)</span>和小平移距离<span class="math">\(t_{ji}\)</span>的两张优化结果。可以发现，如果投影到<span class="math">\(j\)</span>帧上的像素点存在1个像素的误差，大平移距离对应的点<span class="math">\(p_i\)</span>的深度变化可以由图像左侧的绿色大括号表示，而小平移距离对应的点<span class="math">\(p_i\)</span>的深度变化由右侧的绿色大括号表示。可以看出，小平移距离估计的点<span class="math">\(p_i\)</span>的深度受投影像素误差影响比较大。因此<code>DSO</code>才会针对平移距离构建不同的优化目标函数，试图找到一个准确且足够大的<span class="math">\(t_{ji}\)</span>，来保证初始化参考帧上的点<span class="math">\(p_i\)</span>逆深度的稳定性和准确性。</p>
+<div align="center">
+<img src="https://sunshanlu.github.io/dso_ssl/images/triangulation.png" width="70%"/>
+</div>
+<h3 id="21">2.1 平移距离不足时的惩罚项</h3>
+<p><code>DSO</code>在初始化过程中还考虑了平移距离和逆深度连续性的影响，<code>DSO</code>认为在初始化过程中，
+输入的普通帧<span class="math">\(j\)</span>和初始化参考帧<span class="math">\(i\)</span>的平移距离应该达到某个阈值才认为<span class="math">\(j\)</span>帧对参考帧上点逆深度起作用，为了确保在优化过程中得到的相对平移距离足够可靠，<code>DSO</code>在未达到足够的平移距离之前，会对平移距离添加惩罚项，除此之外还会对点的逆深度做一个尺度约束，因此在平移距离不够的条件下，<code>DSO</code>构造的优化目标函数如下：</p>
+<div class="math">$$
+E_f=\sum_{p_i\in R_f}{\sum_{p\in \mathcal{N}_i(p_i)}{||I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}||_{\gamma}}}+E_l\\
+E_l=\frac{\alpha_W}{2} \sum_{p_i\in R_f}{((d_{pi}-1)^2+||t_{ji}||^2_2)}
+$$</div>
+<p>其中：</p>
+<ul>
+<li><span class="math">\(E_f\)</span>部分为平移量不足条件下的优化目标函数；</li>
+<li><span class="math">\(E_l\)</span>部分包含了逆深度尺度惩罚项<span class="math">\((d_{pi} - 1)^2\)</span>和相对平距离的惩罚项<span class="math">\(||t_{ji}||^2_2\)</span>；</li>
+<li><span class="math">\(\alpha_W\)</span>代表调节正则化项部分的超参数，从而在一定程度上改变优化的侧重方向；</li>
+<li><span class="math">\(R_f\)</span>代表是初始化参考帧</li>
+</ul>
+<p>针对<span class="math">\(E_l\)</span>的惩罚项部分，<span class="math">\(E_l^{p_j}\)</span>的整个组成部分相对简单，可以直接求解惩罚项的雅可比矩阵<span class="math">\(J_l\)</span>和海塞矩阵<span class="math">\(H_l\)</span>，而不必使用高斯牛顿法利用残差项的雅可比变换得到：</p>
+<div class="math">$$
+\frac{\partial E_l^{p_j}}{\partial x} = J_{p_i}=\begin{bmatrix}
+    t_{ji}^T &amp; 0_{1 \times 3} &amp; 0 &amp; 0 &amp; d_{pi}-1
+\end{bmatrix}
+\\
+\frac{\partial^2 E_l^{p_j}}{\partial x^2} = H_{pi}=
+\begin{bmatrix}
+    \begin{bmatrix}
+        I_{3\times 3} &amp; \mathbf{0_{3\times3}}\\
+        \mathbf{0_{3\times3}} &amp; \mathbf{0_{3\times3}}
+    \end{bmatrix} &amp; \mathbf{0_{6 \times 1}} &amp; \mathbf{0_{6 \times 1}} &amp; \mathbf{0_{6 \times 1}}\\
+    \mathbf{0_{1 \times 6}} &amp; 0 &amp; 0 &amp; 0 \\
+    \mathbf{0_{1 \times 6}} &amp; 0 &amp; 0 &amp; 0 \\
+    \mathbf{0_{1 \times 6}} &amp; 0 &amp; 0 &amp; 1 \\
+\end{bmatrix} 
+$$</div>
+<div class="admonition important">
+<p class="admonition-title"><span class="math">\(E_l^{p_j}\)</span>和<span class="math">\(E_l\)</span>的区别</p>
+<p>值得注意的是，<span class="math">\(E_l^{p_j}\)</span>的能量值，代表是初始化参考关键帧<span class="math">\(R_f\)</span>上的点<span class="math">\(p_i\)</span>向<span class="math">\(p_j\)</span>部分投影这一约束贡献的系统能量值，或者说是贡献的优化目标函数值。惩罚项的海塞矩阵<span class="math">\(H_l\)</span>可以由所有的<span class="math">\(H_l^{p_j}\)</span>组合而成，即相同的约束部分可以加和，而不用的约束部分需要拓展组成一个大矩阵<span class="math">\(H_l\)</span>，当然，雅可比矩阵也是如此。</p>
+</div>
+<h3 id="22">2.2 平移距离足够时的惩罚项</h3>
+<p>当平移距离足够时，<code>DSO</code>认为初始化参考帧<span class="math">\(i\)</span>中的像素点<span class="math">\(p_i\)</span>的逆深度会有一个相对稳定、准确且尺度一致（因为使用了<span class="math">\((d_{pi}-1)^2\)</span>作为尺度惩罚项）的值，这时，<code>DSO</code>会去掉对平移距离的惩罚项，同时对逆深度进行期望约束，这里的期望值<span class="math">\(iR\)</span>考虑了当前点<span class="math">\(p_i\)</span>和周围点的逆深度关系，即逆深度的平滑性，得到的优化目标函数如下：</p>
+<div class="math">$$
+E_f=\sum_{p_i\in R_f}{\sum_{p\in \mathcal{N}_i(p_i)}{||I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}||_{\gamma}}}+E_l\\
+E_l=\frac{\alpha}{2} \sum_{p_i\in R_f}{(d_{pi}-iR_{i})^2}
+$$</div>
+<p>其中：</p>
+<ul>
+<li><span class="math">\(E_f\)</span>部分为平移量足够条件下的优化目标函数；</li>
+<li><span class="math">\(E_l\)</span>部分包含了逆深度期望惩罚项<span class="math">\((d_{pi} - iR_i)^2\)</span>，充分考虑了周围点逆深度的平滑性；</li>
+<li><span class="math">\(\alpha\)</span>代表调节正则化项部分的超参数，从而在一定程度上改变优化的侧重方向；</li>
+</ul>
+<p>针对<span class="math">\(E_l\)</span>的惩罚项部分，求得其雅可比矩阵和海塞矩阵如下：</p>
+<div class="math">$$
+\frac{\partial{E_l^{p_j}}}{\partial{x}}=J_l^{p_j}=
+\begin{bmatrix}
+    \mathbf{0_{1\times6}} &amp; 0 &amp; 0 &amp; d_{pi}-iR
+\end{bmatrix}
+\\
+\frac{\partial^2{E_l^{p_j}}}{\partial{x^2}} = H_l^{p_j} = 
+\begin{bmatrix}
+    \mathbf{0_{6\times6}} &amp; \mathbf{0_{6 \times 1}} &amp; \mathbf{0_{6 \times 1}} &amp; \mathbf{0_{6 \times 1}}\\
+    \mathbf{0_{1\times6}} &amp; 0 &amp; 0 &amp; 0 \\
+    \mathbf{0_{1\times6}} &amp; 0 &amp; 0 &amp; 0 \\
+    \mathbf{0_{1\times6}} &amp; 0 &amp; 0 &amp; 1 \\
+\end{bmatrix}
+$$</div>
+<h2 id="3">3. 基于金字塔的逆深度传递</h2>
+<p>为了能够方便的表述逆深度传递的重要性，在这部分我会先在3.1小节中梳理一下<code>DSO</code><strong>初始化流程</strong>，然后在3.2小节中重点讲解基于金字塔和相邻点的<strong>逆深度传递过程</strong>。</p>
+<h3 id="31-dso">3.1 DSO初始化过程</h3>
+<p>下图中，使用虚线框标注出来的部分是<code>DSO</code>初始化器的主要工作流程，值得注意的是，在<a href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO">初始化点选之后</a>，参考帧<span class="math">\(R_f\)</span>上会得到点<span class="math">\(p_i\in R_f\)</span>，这些点<span class="math">\(p_i\)</span>会分布在不同的金字塔层级上，为了方便后续这些点的逆深度传递，<code>DSO</code>构造了这些点的<strong>同层相邻点</strong>和<strong>上层父点</strong>之间的关系。</p>
+<div align="center">
+<img alt="init-process" src="https://sunshanlu.github.io/dso_ssl/images/init-process.png" width="80%"/>
+</div>
+<h3 id="32">3.2 逆深度传递</h3>
+<p><code>DSO</code>的初始化器构造了同层相邻点和上层父点之间的关系，这样会比较方便的执行下面的三种操作：</p>
+<ul>
+<li>从上层到下层优化过程中，上层父点会向下层子点提供<strong>逆深度初值</strong>。</li>
+<li>当优化完成后，下层子点会将充分优化的逆深度初值向上层父点传递，以<strong>修正父点逆深度值</strong>。</li>
+<li>由于<code>DSO</code>初始化器在优化目标函数构建中，考虑了相邻点逆深度连续性，这部分连续性的考虑是由相邻点关系实现的。</li>
+</ul>
+<p>在每一步优化结束后，<code>DSO</code>初始化器会更新逆深度值，同样会更新逆深度期望值，期望值的更新考虑了相邻点之间的连续性关系，下面的公式描述了逆深度期望的更新策略：</p>
+<div class="math">$$
+iR_i=(1-\beta)\times{d_{pi}}_{new}+\beta\times{iR_{mid}^i}\\
+iR_{mid}^i={Median}(neighbors(p_i))
+$$</div>
+<p>其中：</p>
+<ul>
+<li><span class="math">\(iR_i\)</span>为点<span class="math">\(p_i\)</span>逆深度的更新期望；</li>
+<li><span class="math">\({d_{pi}}_{new}\)</span>为点<span class="math">\(p_i\)</span>逆深度的优化更新值；</li>
+<li><span class="math">\(\beta\)</span>为相邻点逆深度连续性置信度，在源码为<code>0.8</code>；</li>
+<li><span class="math">\(iR_{mid}^i\)</span>为点<span class="math">\(p_i\)</span>邻居的逆深度期望中值；</li>
+</ul>
+<p><code>DSO</code>初始化器使用同层金字塔<code>K</code>近邻的方式构建同层点和邻居点之间的关系，使用向上层金字塔投影寻找最近邻的方式构建与上层父点之间的关系。</p>
+<h3 id="33">3.3 高斯归一化积</h3>
+<p>考虑父点向子点传递逆深度过程：除了第一次优化过程外，子点都会有一个<strong>相对有效</strong>的逆深度优化值，这时父点还会向子点提供一个逆深度。<code>DSO</code>初始化器使用了高斯归一化来耦合这两个逆深度值，<strong>高斯归一化积</strong>的数学描述如下：</p>
+<div class="math">$$
+\mu_{c} H_{c}=\sum_{i=0}^N \mu_iH_i\\
+H_c=\sum_{i=0}^N H_i
+$$</div>
+<p>父点向子点传递时，子点不仅仅是逆深度值<span class="math">\(d_{pi}\)</span>发生了改变，子点的逆深度期望<span class="math">\(iR\)</span>同样发生了改变，这个传递过程可以由下面的流程图进行描述：</p>
+<div align="center">
+<img alt="up-down" src="https://sunshanlu.github.io/dso_ssl/images/up-down.png" width="100%"/>
+</div>
+<p>3.2中的公式同样描述了，流程图中的<strong>考虑相邻点<span class="math">\(iR\)</span>的连续性</strong>操作。通过这样的操作，可以人为的构造出一个考虑了连续性影响的逆深度期望值出来，从而能够完成后续初始化优化目标函数（会涉及点<span class="math">\(p_i\)</span>的逆深度期望<span class="math">\(iR_i\)</span>）的构建。</p>
+<p>考虑子点向父点的逆深度传递过程：在3.2小节的描述中，父子点之间的关系构造是通过投影和最近邻实现，因此可能会出现一个父点对应多个子点的情况，这时又会出现多个逆深度值同时出现的问题，<code>DSO</code>仍然是通过高斯归一化积来解决这个问题，下面的流程图描述了具体的传递过程：</p>
+<div align="center">
+<img alt="down-up" src="https://sunshanlu.github.io/dso_ssl/images/down-up.png" width="100%"/>
+</div>
+<h2 id="4-schur">4. 初始化器的Schur优化加速</h2>
+<p>这里我打算以<span class="math">\(t_{ji}\)</span>不足条件下的优化加速为例，初始化中<span class="math">\(t_{ji}\)</span>不足时的优化目标函数如下：</p>
+<div class="math">$$
+E_f=\sum_{p_i\in R_f}{\sum_{p\in \mathcal{N}_i(p_i)}{||I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}||_{\gamma}}}+E_l\\
+E_l=\alpha \sum_{p_i\in R_f}{(d_{pi}-iR_{i})^2}
+$$</div>
+<p>首先，考虑非惩罚部分<span class="math">\(E_{nl}=E_f-E_l\)</span>，这部分能量的残差为<span class="math">\(r_k^{nl}=I_j(p')-e^a_{ji}I_{R_f}(p)-b_{ji}\)</span>，那么根据高斯牛顿法，在<strong>不考虑<code>Huber</code>核函数</strong>的情况下，可以构建优化方程：</p>
+<div class="math">$$ 
+\begin{align*}
+    H_{nl}^{p_j} &amp; =\sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{x}})^T(\frac{\partial{r_k^{nl}}}{\partial{x}})} \\ &amp; =
+    \begin{bmatrix}
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T (\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T (\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T (\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})} \\
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}}} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})} \\
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})}&amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})}&amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})}&amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})} \\
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})} &amp;
+        \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})}
+    \end{bmatrix}
+\end{align*}
+$$</div>
+<div class="math">$$
+b_{nl}^{p_j}=-\sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{x}})^T \times r_k^{nl}}\quad=
+-\begin{bmatrix}
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}})^T \times r_k^{nl}} \\
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{a_{ji}}})^T \times r_k^{nl}} \\
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}})^T \times r_k^{nl}} \\
+    \sum_{p \in \mathcal{N_i(p_i)}}{(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}})^T \times r_k^{nl}}
+\end{bmatrix}
+$$</div>
+<div class="math">$$
+H_{nl}=
+\begin{bmatrix}
+    \sum_{p_i \in R_f}{U_{p_j}} &amp; W^{p_0} &amp; W_{p_1} &amp; ... &amp; W_{p_m} \\
+    W_{p_0} &amp; V_{p_0} \\
+    W_{p_1} &amp; &amp; V_{p_1}\\
+    ... &amp; &amp; &amp; ... \\ 
+    W_{p_m} &amp; &amp; &amp; &amp; V_{p_m}\\
+\end{bmatrix}
+\quad
+b_{nl}=
+-\begin{bmatrix}
+    \sum_{p_i \in R_f}{b_{U}} \\
+    b_{V_{p_0}} \\ 
+    b_{V_{p_1}} \\ 
+    ... \\
+    b_{V_{p_m}} \\ 
+\end{bmatrix}
+$$</div>
+<p>其中：</p>
+<ul>
+<li><span class="math">\(\frac{\partial{r_k^{nl}}}{\partial{\delta\xi_{ji}}}\)</span>、<span class="math">\(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}}\)</span>的计算公式在<a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">DSO中的优化模型</a>文章中推导过；</li>
+<li><span class="math">\(\frac{\partial{r_k^{nl}}}{\partial{b_{ji}}}\)</span>、<span class="math">\(\frac{\partial{r_k^{nl}}}{\partial{d_{pi}}}\)</span>的计算公式在本篇文章的第一小节中推导过；</li>
+<li><span class="math">\(H_{nl}^{pj}\)</span>和<span class="math">\(b_{nl}^{p_j}\)</span>，为某个点<span class="math">\(p_i\)</span>投影到<span class="math">\(p_j\)</span>这部分的优化约束；</li>
+<li><span class="math">\(H_{nl}\)</span>和<span class="math">\(b_{nl}\)</span>，为不含惩罚项部分的能量函数总约束，我使用了分块矩阵进行表示，这么做比较方便，矩阵分块结构图如下：</li>
+</ul>
+<div align="center">
+<img alt="mat-block" src="https://sunshanlu.github.io/dso_ssl/images/mat-block.png" width="100%"/>
+</div>
+<p>对惩罚项部分，根据文章的第2小节推导的公式，考虑超参数<span class="math">\(\alpha_W\)</span>，并使用上图中的分块方式，可以得到惩罚项部分的优化约束矩阵：</p>
+<div class="math">$$
+H_l= \alpha_W
+\begin{bmatrix}
+    \sum_{p_i \in R_f}{\begin{bmatrix}
+        I_{3\times 3} &amp; \mathbf{0_{3\times3}} &amp; \mathbf{0_{3 \times 1}} &amp; \mathbf{0_{3 \times 1}}\\ 
+        \mathbf{0_{3\times3}} &amp; \mathbf{0_{3\times3}} &amp; \mathbf{0_{3 \times 1}} &amp; \mathbf{0_{3 \times 1}}\\ 
+        \mathbf{0_{1\times3}} &amp; \mathbf{0_{1\times3}} &amp; 0 &amp; 0\\ 
+        \mathbf{0_{1\times3}} &amp; \mathbf{0_{1\times3}} &amp; 0 &amp; 0\\ 
+    \end{bmatrix}} &amp; \mathbf{0_{8\times1}} &amp; \mathbf{0_{8\times1}} &amp; ... &amp; \mathbf{0_{8\times1}}\\
+    \mathbf{0_{1\times8}} &amp; 1\\
+    \mathbf{0_{1\times8}} &amp; &amp; 1\\
+    ... &amp; &amp; &amp;...\\
+    \mathbf{0_{1\times8}} &amp; &amp; &amp; &amp; 1\\
+\end{bmatrix} 
+\\
+b_l = -\alpha_W 
+\begin{bmatrix}
+    \begin{bmatrix}t_{ji}\\ \mathbf{0_{3\times1}} \\0\\0\end{bmatrix}\\d_{p0}-1\\d_{p1}-1\\...\\d_{pm}-1
+\end{bmatrix}
+$$</div>
+<p>因此整个系统的优化约束为：</p>
+<div class="math">$$
+H=H_{nl}+H_{l}=
+\begin{bmatrix}
+    \sum_{p_i \in R_f}{U_{p_j}'} &amp; W^{p_0} &amp; W_{p_1} &amp; ... &amp; W_{p_m} \\
+    W_{p_0} &amp; V_{p_0}+\alpha_W \\
+    W_{p_1} &amp; &amp; V_{p_1}+\alpha_W \\
+    ... &amp; &amp; &amp; ... \\ 
+    W_{p_m} &amp; &amp; &amp; &amp; V_{p_m}+\alpha_W \\
+\end{bmatrix}
+\quad
+b=b_{nl}+b_l=
+-\begin{bmatrix}
+    \sum_{p_i \in R_f}{b_{U}'} \\
+    b_{V_{p_0}} + \alpha_W(d_{p_0} - 1) \\ 
+    b_{V_{p_1}} + \alpha_W(d_{p_1} - 1) \\ 
+    ... \\
+    b_{V_{p_m}} + \alpha_W(d_{p_m} - 1) \\ 
+\end{bmatrix}
+\\
+U_{p_j}'=U_{p_j} + \alpha_W
+\begin{bmatrix}
+    I_{3\times 3} &amp; \mathbf{0_{3\times3}} &amp; \mathbf{0_{3 \times 1}} &amp; \mathbf{0_{3 \times 1}}\\ 
+    \mathbf{0_{3\times3}} &amp; \mathbf{0_{3\times3}} &amp; \mathbf{0_{3 \times 1}} &amp; \mathbf{0_{3 \times 1}}\\ 
+    \mathbf{0_{1\times3}} &amp; \mathbf{0_{1\times3}} &amp; 0 &amp; 0\\ 
+    \mathbf{0_{1\times3}} &amp; \mathbf{0_{1\times3}} &amp; 0 &amp; 0\\ 
+\end{bmatrix}
+\quad
+b_{U}'=b_{U} + \alpha_W \begin{bmatrix}t_{ji}\\ \mathbf{0_{3\times1}} \\0\\0\end{bmatrix}
+$$</div>
+<p>最后，根据SLAM十四讲<code>p249</code>页描述的<code>Schur</code>分解公式，先将涉及逆深度部分分解掉，求解相对位姿和相对仿射参数的增量，然后将相对位姿增量和相对仿射参数增量再次带入涉及逆深度方程的部分，求解得到逆深度增量即可。</p>
+<div class="admonition important">
+<p class="admonition-title">大矩阵<code>Schur</code>和小矩阵<code>Schur</code></p>
+<p>在上面的推导中，初始化器总优化约束的<span class="math">\(H\)</span>矩阵和<span class="math">\(b\)</span>矩阵由所有投影关系<span class="math">\(p_j\)</span>-<span class="math">\(p_i\)</span>的优化约束<span class="math">\(H_{p_j}\)</span>和<span class="math">\(b_{p_j}\)</span>得到。同样不难证明，大矩阵<span class="math">\(H\)</span>和<span class="math">\(b\)</span>进行<code>Schur</code>分解和所有小矩阵<span class="math">\(H_{p_j}\)</span>和<span class="math">\(b_{p_j}\)</span>分别<code>Schur</code>分解然后组合拼接（这里直接累加即可，因为分解后的矩阵的约束变量是相同的）的效果是一样的。<code>DSO</code>的源码里面也利用了这个结论，从而避免了大稀疏矩阵构建导致的高空间复杂度问题。</p>
+</div>
+<script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width < 768) ? "left" : align;
+        indent = (screen.width < 768) ? "0em" : indent;
+        linebreak = (screen.width < 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+</script>
+
+
+             
+ 
+                <p id="post-share-links">
+    喜欢这篇文章吗？喜欢就分享吧:
+      <a href="https://twitter.com/intent/tweet?text=DSO%E4%B8%AD%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96&url=https%3A//sunshanlu.github.io/dso_ssl/Initialization-of-DSO&hashtags=vslam,dso,robot" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//sunshanlu.github.io/dso_ssl/Initialization-of-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=DSO%E4%B8%AD%E7%9A%84%E5%88%9D%E5%A7%8B%E5%8C%96&amp;body=https%3A//sunshanlu.github.io/dso_ssl/Initialization-of-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+
+                <hr />
+    <div class="author-blurb">
+        <a href="https://github.com/sunshanlu" target="_blank" rel="nofollow noopener noreferrer">
+            <img src=https://avatars.githubusercontent.com/u/78467062 alt="孙善路-github Avatar" title="孙善路-github">
+            <span class="author-name">孙善路-github</span>
+        </a>
+        对SLAM和DL感兴趣的理工男
+    </div>
+    <div class="author-blurb">
+        <a href="https://space.bilibili.com/489032586" target="_blank" rel="nofollow noopener noreferrer">
+            <img src=https://sunshanlu.github.io/dso_ssl/images/avatars/sunshanlu.png alt="孙善路-bilibili Avatar" title="孙善路-bilibili">
+            <span class="author-name">孙善路-bilibili</span>
+        </a>
+        对SLAM和DL感兴趣的理工男
+    </div>
+
+            
+
+
+
+
+
+
+
+<section>
+    <h6 style="display:none;">Comments</h6>
+    <p id="comment-message">有什么问题吗，有任何问题欢迎你在下面评论留言或者邮件联系我！ </p>
+
+    <div class="accordion" id="accordion2">
+        <div class="accordion-group">
+            <div class="accordion-heading">
+                <a class="accordion-toggle disqus-comment-count comment-count collapsed"
+                   data-toggle="collapse"
+                   data-parent="#accordion2"
+                   href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO#comment_thread"
+                   id="comment-accordion-toggle">
+                    Comments
+                </a>
+            </div>
+            <div id="comment_thread" class="accordion-body collapse">
+                <div class="accordion-inner">
+                    <div class="comments">
+
+                        <script src="https://utteranc.es/client.js"
+        data-repo="sunshanlu/dso_ssl"
+        data-issue-term="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO"
+        data-label="✨💬✨"
+        data-theme="github-light"
+        crossorigin="anonymous"
+        async>
+</script>
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+            <hr/>
+<section>
+    <h2>Keep Reading</h2>
+<ul class="related-posts-list">
+<li><a href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO" title="DSO的算法优势">DSO的算法优势</a></li>
+<li><a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" title="DSO中的去畸变操作">DSO中的去畸变操作</a></li>
+<li><a href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO" title="DSO中的点选策略">DSO中的点选策略</a></li>
+<li><a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO" title="DSO中的优化模型">DSO中的优化模型</a></li>
+</ul>
+<hr />
+</section>
+            <aside>
+            <nav>
+            <ul class="articles-timeline">
+                <li class="previous-article">« <a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO" title="Previous: DSO中的优化模型">DSO中的优化模型</a></li>
+            </ul>
+            </nav>
+            </aside>
+        </div>
+        <section id="article-sidebar" class="span2">
+            <h4>Published</h4>
+            <time itemprop="dateCreated" datetime="2025-01-16T00:00:00+08:00">2025-01-16</time>
+            <h4>Category</h4>
+            <a class="category-link" href="https://sunshanlu.github.io/dso_ssl/categories#dso-ref">DSO</a>
+            <h4>Tags</h4>
+            <ul class="list-of-tags tags-in-article">
+                <li><a href="https://sunshanlu.github.io/dso_ssl/tags#dso-ref">DSO
+                    <span class="superscript">5</span>
+</a></li>
+                <li><a href="https://sunshanlu.github.io/dso_ssl/tags#robot-ref">Robot
+                    <span class="superscript">5</span>
+</a></li>
+                <li><a href="https://sunshanlu.github.io/dso_ssl/tags#vslam-ref">vSLAM
+                    <span class="superscript">5</span>
+</a></li>
+            </ul>
+<h4>Contact Me</h4>
+<div id="sidebar-social-link">
+    <a href="https://github.com/sunshanlu" title="Github 页面" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="GitHub" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#1B1817"/><path fill="#fff" d="M335 499c14 0 12 17 12 17H165s-2-17 12-17c13 0 16-6 16-12l-1-50c-71 16-86-28-86-28-12-30-28-37-28-37-24-16 1-16 1-16 26 2 40 26 40 26 22 39 59 28 74 22 2-17 9-28 16-35-57-6-116-28-116-126 0-28 10-51 26-69-3-6-11-32 3-67 0 0 21-7 70 26 42-12 86-12 128 0 49-33 70-26 70-26 14 35 6 61 3 67 16 18 26 41 26 69 0 98-60 120-117 126 10 8 18 24 18 48l-1 70c0 6 3 12 16 12z"/></svg>
+    </a>
+    <a href="mailto:ssl2001@126.com" title="Email Me" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="Mail" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#328cff"/><path d="m250 186c-46 0-69 35-69 74 0 44 29 72 68 72 43 0 73-32 73-75 0-44-34-71-72-71zm-1-37c30 0 57 13 77 33 0-22 35-22 35 1v150c-1 10 10 16 16 9 25-25 54-128-14-187-64-56-149-47-195-15-48 33-79 107-49 175 33 76 126 99 182 76 28-12 41 26 12 39-45 19-168 17-225-82-38-68-36-185 67-248 78-46 182-33 244 32 66 69 62 197-2 246-28 23-71 1-71-32v-11c-20 20-47 32-77 32-57 0-108-51-108-108 0-58 51-110 108-110" fill="#fff"/></svg>
+    </a>
+    <a href="/feeds/all.atom.xml" title="" target="_blank" rel="nofollow noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-label="RSS" role="img" viewBox="0 0 512 512"><rect width="512" height="512" rx="15%" fill="#f80"/><circle cx="145" cy="367" r="35" fill="#fff"/><path fill="none" stroke="#fff" stroke-width="60" d="M109 241c89 0 162 73 162 162M109 127c152 0 276 124 276 276"/></svg>
+    </a>
+</div>
+            
+
+
+
+
+
+            
+
+
+
+
+
+        </section>
+</div>
+</article>
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe.
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides.
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo https://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>                    </div>
+                    <div class="span1"></div>
+                </div>
+            </div>
+        </div>
+<footer>
+    <div>
+        Content licensed under <a rel="license nofollow noopener noreferrer"
+    href="http://creativecommons.org/licenses/by/4.0/" target="_blank">
+    Creative Commons Attribution 4.0 International License</a>.
+    </div>
+
+    <div>
+        <span class="site-name">SSL的SLAM系列 - DSO</span> - 最好的DSO解析系列
+    </div>
+
+
+
+    <div id="fpowered">
+        Powered by: <a href="http://getpelican.com/" title="Pelican Home Page" target="_blank" rel="nofollow noopener noreferrer">Pelican</a>
+        Theme: <a href="https://elegant.oncrashreboot.com/" title="Theme Elegant Home Page" target="_blank" rel="nofollow noopener noreferrer">Elegant</a>
+        Hosted on:
+        <a href=https://www.github.com/ target="_blank" rel="nofollow noopener noreferrer">
+            Github
+        </a>
+    </div>
+</footer>            <script src="//code.jquery.com/jquery.min.js"></script>
+        <script src="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js"></script>
+        <script src="https://sunshanlu.github.io/dso_ssl/theme/js/elegant.prod.9e9d5ce754.js"></script>
+        <script>
+            function validateForm(query)
+            {
+                return (query.length > 0);
+            }
+        </script>
+
+    <script>
+    (function () {
+        if (window.location.hash.match(/^#comment-\d+$/)) {
+            $('#comment_thread').collapse('show');
+        }
+    })();
+    window.onhashchange=function(){
+        if (window.location.hash.match(/^#comment-\d+$/))
+            window.location.reload(true);
+    }
+    $('#comment_thread').on('shown', function () {
+        var link = document.getElementById('comment-accordion-toggle');
+        var old_innerHTML = link.innerHTML;
+        $(link).fadeOut(200, function() {
+            $(this).text('Click here to hide comments').fadeIn(200);
+        });
+        $('#comment_thread').on('hidden', function () {
+            $(link).fadeOut(200, function() {
+                $(this).text(old_innerHTML).fadeIn(200);
+            });
+        })
+    })
+</script>
+
+    </body>
+    <!-- Theme: Elegant built for Pelican
+        License : MIT -->
+</html>
