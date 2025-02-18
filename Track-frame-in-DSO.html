@@ -12,23 +12,23 @@
 
         <meta name="google-site-verification" content="UpDPegqFb_TnOIJbDp5ud8wVncaUoUB-fJoQyiiAdmg" />        <meta name="msvalidate.01" content="A86784EE624E2187E0AC969B764CE1E1" />        <meta name="author" content="孙善路-github" />
 
-        <meta name="description" content="1. 像素去畸变 1.1 畸变模型 DSO中引入了不同的畸变模型，来解决不同相机的像素畸变问题，除了我们在SLAM十四讲里面熟知的RadTan畸变模型外，还有FOV和KannalaBrandt畸变模型。不同 …
+        <meta name="description" content="DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍 …
 " />
         <meta property="og:type" content="article" />
         <meta name="twitter:card" content="summary">
 
 <meta name="keywords" content="vSLAM, DSO, Robot, DSO, " />
 
-<meta property="og:title" content="DSO中的去畸变操作 "/>
-<meta property="og:url" content="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" />
-<meta property="og:description" content="1. 像素去畸变 1.1 畸变模型 DSO中引入了不同的畸变模型，来解决不同相机的像素畸变问题，除了我们在SLAM十四讲里面熟知的RadTan畸变模型外，还有FOV和KannalaBrandt畸变模型。不同 …" />
+<meta property="og:title" content="DSO的前端跟踪 "/>
+<meta property="og:url" content="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO" />
+<meta property="og:description" content="DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍 …" />
 <meta property="og:site_name" content="SSL的SLAM系列 - DSO" />
 <meta property="og:article:author" content="孙善路-github" />
-<meta property="og:article:published_time" content="2025-01-09T00:00:00+08:00" />
-<meta name="twitter:title" content="DSO中的去畸变操作 ">
-<meta name="twitter:description" content="1. 像素去畸变 1.1 畸变模型 DSO中引入了不同的畸变模型，来解决不同相机的像素畸变问题，除了我们在SLAM十四讲里面熟知的RadTan畸变模型外，还有FOV和KannalaBrandt畸变模型。不同 …">
+<meta property="og:article:published_time" content="2025-02-18T00:00:00+08:00" />
+<meta name="twitter:title" content="DSO的前端跟踪 ">
+<meta name="twitter:description" content="DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍 …">
 
-        <title>DSO中的去畸变操作  · SSL的SLAM系列 - DSO
+        <title>DSO的前端跟踪  · SSL的SLAM系列 - DSO
 </title>
         <link rel="shortcut icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/favicon.ico" type="image/x-icon" />
         <link rel="icon" href="https://sunshanlu.github.io/dso_ssl/theme/images/apple-touch-icon-152x152.png" type="image/png" />
@@ -83,8 +83,8 @@
 <div class="row-fluid">
     <header class="page-header span10 offset2">
         <h1>
-            <a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO">
-                DSO中的去畸变操作
+            <a href="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO">
+                DSO的前端跟踪
             </a>
         </h1>
     </header>
@@ -96,16 +96,21 @@
         <h4>Contents</h4>
         <div class="toc">
 <ul>
-<li><a href="#1">1. 像素去畸变</a><ul>
-<li><a href="#11">1.1 畸变模型</a></li>
-<li><a href="#12-dsopinhole">1.2 DSO中畸变模型转Pinhole逻辑</a></li>
+<li><a href="#1">1. 参考帧确定和跟踪参考点构建（跟踪前处理）</a><ul>
+<li><a href="#11">1.1 金字塔参考点初构建</a></li>
+<li><a href="#12">1.2 金字塔参考点膨胀</a></li>
 </ul>
 </li>
-<li><a href="#2">2. 光度去畸变</a><ul>
-<li><a href="#21">2.1 光度畸变模型</a></li>
-<li><a href="#22">2.2 无光度参数的解决方案</a></li>
+<li><a href="#2">2. 实施跟踪过程（构建模型并优化）</a><ul>
+<li><a href="#21">2.1 构建优化初值假设库</a></li>
+<li><a href="#22">2.2 基于某种假设的跟踪尝试</a><ul>
+<li><a href="#221">2.2.1 跟踪模型</a></li>
+<li><a href="#222">2.2.2 雅可比矩阵构建</a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li><a href="#3">3. 关键帧判断（跟踪后处理）</a></li>
 </ul>
 </div>
         </nav>
@@ -113,99 +118,90 @@
     <div class="span8 article-content">
             
             
-<h2 id="1">1. 像素去畸变</h2>
-<h3 id="11">1.1 畸变模型</h3>
-<p>DSO中引入了不同的畸变模型，来解决不同相机的像素畸变问题，除了我们在SLAM十四讲里面熟知的<code>RadTan</code>畸变模型外，还有<code>FOV</code>和<code>KannalaBrandt</code>畸变模型。不同的像素畸变模型的公式由下面的公式给出：</p>
-<p>首先是我们熟知的<code>RadTan</code>径向切向畸变模型，可以根据畸变程度选择不同参数数量进行配置计算，常用的有三参数法（<span class="math">\(k_1\)</span>,<span class="math">\(p_1\)</span>,<span class="math">\(p_2\)</span>）和五参数法（<span class="math">\(k_1\)</span>,<span class="math">\(k_2\)</span>,<span class="math">\(k_3\)</span>,<span class="math">\(p_1\)</span>,<span class="math">\(p_2\)</span>）：</p>
-<div class="math">$$
-\left\{\begin{matrix}
- x_{distorted} = x(1+k_1r^2+k_2r^4+k_3r^6) + 2p_1xy+p_2(r^2+2x^2)\\
- y_{distorted} = y(1+k_1r^2+k_2r^4+k_3r^6) + 2p_2xy+p_1(r^2+2y^2)\\
- r = \sqrt{x^2+y^2}
-\end{matrix}\right.
-$$</div>
-<p>然后是<code>FOV</code>视野畸变模型，仅有一个参数<span class="math">\(\omega\)</span>：</p>
-<div class="math">$$
-\left\{\begin{matrix} 
- x_{distorted} =\frac{r_{d}}{r}\cdot x\\ 
- y_{distorted} =\frac{r_{d}}{r}\cdot y\\
- r_{d} =\frac{1}{\omega }arctan(2\cdot r\cdot tan(\frac{\omega }{2}))\\
- r = \sqrt{x^2 + y^2}\\
-\end{matrix}\right.
-$$</div>
-<p>最后是<code>KannalaBrandt</code>光度畸变模型，有四个参数<span class="math">\(k_1\)</span>,<span class="math">\(k_2\)</span>,<span class="math">\(k_3\)</span>,<span class="math">\(k_4\)</span>：</p>
-<div class="math">$$
-\left\{\begin{matrix} 
- x_{distorted} = \frac{\theta _{d}}{r}\cdot x_{c}\\ 
- y_{distorted} = \frac{\theta _{d}}{r}\cdot y_{c}\\
- \theta = atan(r)\\
- \theta_{d}=\theta(1+k_1\theta^2+k_2\theta^4+k_3\theta^6+k_4\theta^8)
-\end{matrix}\right.
-$$</div>
-<h3 id="12-dsopinhole">1.2 DSO中畸变模型转Pinhole逻辑</h3>
-<p>当然，这里的畸变模型并不是我想向大家进行解析的重点，<code>DSO</code>将这种像素畸变模型向小孔成像模型<code>Pinhole</code>进行了转换，而这个转换的逻辑，是我想给大家分享的重点！这里三种不同的畸变模型，我以<span class="math">\(d(p,K)\)</span>来进行表示，这里的<span class="math">\(p\)</span>表示归一化坐标系下的某个实际点，而<span class="math">\(K\)</span>表示畸变模型的参数。</p>
+<p>DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍。</p>
+<h2 id="1">1. 参考帧确定和跟踪参考点构建（跟踪前处理）</h2>
+<p>当DSO系统的初始化完成后，目前整个系统中会有<strong>两个关键帧</strong>和<strong>若干激活地图点</strong>，当然激活地图点的<code>host</code>帧为初始化参考帧。和初始化过程类似，由于新来的一帧<code>frame</code>的位姿不明确，需要一个相对鲁邦的位姿估计方法，和初始化过程一样，<code>DSO</code>的前端跟踪部分采用的也是基于金字塔由粗至精的跟踪方法，因此需要确定一个跟踪参考帧和若干跟踪地图点。</p>
+<p>在介绍参考点构建之前，我先明确一个问题，就是<code>DSO</code>系统会维护一个<strong>关键帧队列</strong>，即<code>DSO</code>中的关键帧<strong>滑动窗口</strong>，至于这个滑窗的维护策略，我会在后续文章中进行介绍。</p>
+<h3 id="11">1.1 金字塔参考点初构建</h3>
+<p><code>DSO</code>使用了最新关键帧作为跟踪过程中的参考关键帧。为了提高跟踪鲁棒性，滑动窗口中的所有激活地图点都会投影到最新关键帧的第0层上。正如下面这个图所描述的那样，来初始化跟踪参考关键帧上第0层的像素点逆深度。</p>
+<p>在投影过程中，<code>DSO</code>系统使用了四舍五入的方式来计算投影点的像素位置，因此存在多个点投影到同一个像素位置的情况，这里使用<a href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO#33">DSO中的初始化的3.3节</a>讲到的高斯归一化积解决同像素位置不同逆深度的问题。</p>
 <div align="center">
-<img alt="distorted image" src="https://sunshanlu.github.io/dso_ssl/images/distorted.png" width="40%"/>
-<img alt="undistorted image" src="https://sunshanlu.github.io/dso_ssl/images/undistorted.png" width="40%"/>
+<img src="https://sunshanlu.github.io/dso_ssl/images/point-build.png" width="70%"/>
 </div>
-<ol>
-<li>在归一化坐标系上，划定一块足够大的区域<span class="math">\(S\)</span>，在<code>DSO</code>的源码里面是<span class="math">\(x\in[-5,+5],y\in[-5,+5]\)</span>，试图通过在<span class="math">\(x=0\)</span>和<span class="math">\(y=0\)</span>的区域线段上，找到一组极限位置<span class="math">\(X_{min}\)</span>、<span class="math">\(X_{max}\)</span>、<span class="math">\(Y_{min}\)</span>和<span class="math">\(Y_{max}\)</span>，作为初始的粗略归一化区域（这个区域包含足够多的像素信息）。</li>
-<li>在<code>X=0</code>轴方向上，以y划分为10万个刻度点，使用这些点向畸变坐标系进行投影，试图找到一个<span class="math">\(Y_{min}\)</span>和<span class="math">\(Y_{max}\)</span>，对应的这两个点的像素投影点都应在畸变像素坐标系内。</li>
-<li>在<code>Y=0</code>轴方向上，使用上面一样的策略，寻找<span class="math">\(X_{min}\)</span>和<span class="math">\(X_{max}\)</span>。</li>
-<li>在获得的极限位置轴上，取点（点的个数可以是畸变图像的宽度或者高度，以保证足够的分辨率），进行畸变和投影获得畸变像素坐标，判断像素坐标是否在图像范围内。</li>
-<li>如果所有点都在像素图像范围内，则认为这个这个轴的位置是合理的。</li>
-<li>如果存在点不在像素图像范围内，则需要将这个轴的位置进行向内移动，源码中是<code>*0.995</code>，以此来达到向内移动的效果。</li>
-<li>注意，当X轴和Y轴部分都需要向内移动时，源码中为了防止额外的像素损失，仅尺寸较大的那一轴进行移动。</li>
-<li>总的来说，<code>DSO</code>在实现畸变模型到纯小孔成像模型之间转换的时候，使用了两步法实现，首先，通过<code>X=0</code>和<code>Y=0</code>两个轴上的点确定一个较粗粒度的归一化区域，因为使用的是归一化中心点，因此这个区域肯定可以覆盖绝大部分的可视像素信息。然后再不断的投影四个极限轴上的点来实现轴的缩放，因此来获取一个精确的归一化区域。</li>
-</ol>
-<p>使用上述说明的方式，可以获得一个归一化区域，这个区域内的所有点向畸变像素坐标系投影的结果都会在畸变图像范围内。在给定目标图像的宽度<code>w</code>和高度<code>h</code>后，可以计算获得<code>pinhole</code>条件下的内参矩阵<code>K</code>:</p>
-<div class="math">$$
-\left\{\begin{matrix}
-    f_xX_{min} + c_x = 0\\
-    f_yY_{min} + c_y = 0\\
-    f_xX_{max} + c_x = w\\
-    f_yY_{max} + c_y = h 
-\end{matrix}
-\right.
-$$</div>
-<p>最终可以得到：</p>
-<div class="math">$$
-K = \begin{bmatrix}
-    \frac{w}{X_{max}-X_{min}} &amp; 0 &amp; -\frac{wX_{min}}{X_{max}-X_{min}}\\
-    0 &amp; \frac{h}{Y_{max}-Y_{min}} &amp; -\frac{hY_{min}}{Y_{max}-Y_{min}}\\
-    0 &amp; 0 &amp; 1
-\end{bmatrix}
-$$</div>
-<p>在得到纯小孔成像模型的相机内参矩阵<code>K</code>后，为了更加方便的实现畸变图像到非畸变图像的转换，<code>DSO</code>维护了一组映射表<code>remapX</code>和<code>remapY</code>。这组映射表的构建逻辑也比较简单，可以通过下面的这张图进行表示：</p>
+<p>根据跟踪参考帧第0层上的像素逆深度点，向上层进行投影得到参考帧第1层的像素逆深度点，以此类推最终得到初步的跟踪参考点逆深度，这里同样会存在多对一的情况，依然使用高斯归一化积解决。</p>
+<h3 id="12">1.2 金字塔参考点膨胀</h3>
+<p>除了使用上述投影方式，<code>DSO</code>的源码中使用了膨胀手段来进一步增加参考点的数目，正如下图所示，紫色的位置代表某个金字塔层级上没有逆深度点的像素位置，而青色位置代表膨胀遍历位置，即遍历青色位置试图寻找一个有逆深度的像素点，然后使用取均值的方式再紫色位置膨胀出逆深度点出来。下图是<code>DSO</code>中采用的两种膨胀遍历方式，左侧是金字塔0层和1层的膨胀方式，右侧是其他层的膨胀方式。</p>
 <div align="center">
-<img alt="distorted image" src="https://sunshanlu.github.io/dso_ssl/images/remap.png" width="100%"/>
+<img src="https://sunshanlu.github.io/dso_ssl/images/point-swell.png" width="70%"/>
 </div>
-<p>针对无畸变坐标系下的某个像素点<span class="math">\(p_i\)</span>，通过反向投影到归一化坐标系下得到<span class="math">\(p_{norm}\)</span>，然后使用畸变参数模型在归一化坐标系下对点<span class="math">\(p_{norm}\)</span>进行畸变处理得到点<span class="math">\(p_{norm}^{dis}\)</span>，然后使用原来的相机内参<span class="math">\(K_{org}\)</span>进行投影，得到无畸变像素坐标系点<span class="math">\(p_i\)</span>和有畸变像素坐标系<span class="math">\(p_i^{dis}\)</span>之间的映射关系。<code>DSO</code>将这部分对应起来的映射关系存储到<code>remapX</code>和<code>remapY</code>中，以便快速的进行无畸变图像的构建。这里还需要注意的是，使用映射表得到畸变像素坐标后，需要使用双线性插值实现像素值或者说是像素能量值（光度去畸变后）的精确获取。</p>
-<h2 id="2">2. 光度去畸变</h2>
-<h3 id="21">2.1 光度畸变模型</h3>
-<p><code>DSO</code>的作者考虑了相机的成像过程，针对形成漫反射的某个点<code>p</code>来讲,它会产生辐射<span class="math">\(B_i(x)\)</span>，相机的感光器件会接收到这个这个点的辐射<span class="math">\(B_i(x)\)</span>。但是由于辐射在相机的透镜中会发生一些扭曲，造成相机成像的渐晕现象（中间部分接收的辐射较高，而周围的较低），这种渐晕会被建模称<span class="math">\(V(x)\)</span>，一般会用一张和成像尺寸相同的灰度图来表示，下面是<code>TUM/sequence_29</code>数据集中的渐晕图表示。</p>
+<div class="admonition note">
+<p class="admonition-title">膨胀点原因猜测</p>
+<p>这里膨胀点的方式和我在<a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">DSO中的优化模型</a>文章中提到的<code>pattern</code>类似，<code>pattern</code>的作用是使用周围像素共享中心点的逆深度，以此来增强灰度不变形假设的可行性。个人猜测<code>DSO</code>在这里使用膨胀的原因和<code>pattern</code>类似，尝试以这种方式提高假设的可靠性。</p>
+</div>
+<h2 id="2">2. 实施跟踪过程（构建模型并优化）</h2>
+<p>有了参考帧和待跟踪的参考点后，就可以实施前端跟踪过程了。除了使用图像金字塔从粗到精的跟踪手段外，<code>DSO</code>还拓展了不同的运动假设来构建优化初值假设库，试图找到一个最优初值，从而加速优化过程，提高达到最优值的可能性。</p>
+<h3 id="21">2.1 构建优化初值假设库</h3>
+<p><code>DSO</code>考虑了<strong>恒速运动</strong>、<strong>倍数运动</strong>、<strong>半速运动</strong>和<strong>相对参考帧静止</strong>的模型假设，除此之外<code>DSO</code>还做了<strong>小旋转运行假设</strong>，所有的运动假设模型我都在下面的图片里面表示了出来，共有<span class="math">\((3 * 3 * 3 - 1) * 3 + 4\)</span>种假设结果。其中待优化帧的光度仿射参数<span class="math">\(a_j\)</span>和<span class="math">\(b_j\)</span>直接使用的上一帧光度仿射参数<span class="math">\(a_{last}\)</span>和<span class="math">\(b_{last}\)</span>作为初值，这是因为自然条件下，相邻帧之间的光度仿射参数变化非常小。</p>
 <div align="center">
-<img alt="渐晕表示" src="https://sunshanlu.github.io/dso_ssl/images/vignette.png" width="60%"/>
+<img src="https://sunshanlu.github.io/dso_ssl/images/pose-assume.png" width="95%"/>
 </div>
-<p>相机的感光器件在一定的曝光时间<span class="math">\(t_i\)</span>内（很短的一段时间内），对辐射进行积分，假设在曝光时间内的辐射恒定那么感光器件获取到的能量值可以通过<span class="math">\(IR_{acc}(x)=t_iV(x)B_i(x)\)</span>进行表示。</p>
-<p>除此之外，相机并不会直接将能量作为像素值的输出，而是会经过相机的非线性响应函数<span class="math">\(G\)</span>进行转换，<span class="math">\(I_i(x)=G(t_iV(x)B_i(x))\)</span>，而<span class="math">\(G^{-1}\)</span>一般通过<strong>单调递增</strong>的<a href="https://sunshanlu.github.io/dso_ssl/files/pcalib.txt">256个数值</a>进行表示，即索引部分为像素值，而值部分对应的是某个适应的能量值。</p>
-<p>因为<code>DSO</code>这种直接法会直接跟像素值打交道，为了避免渐晕<span class="math">\(V(x)\)</span>和曝光时间<span class="math">\(G\)</span>响应函数的干扰，<code>DSO</code>在这里进行了光度矫正处理，矫正处理的结果为：</p>
+<h3 id="22">2.2 基于某种假设的跟踪尝试</h3>
+<h4 id="221">2.2.1 跟踪模型</h4>
+<p>某种位姿假设初值<span class="math">\(T_{cr}\)</span>确定后，<code>DSO</code>前端跟踪部分会使用下面的公式构造优化目标函数。</p>
 <div class="math">$$
-I'_i(x)=t_iB_i(x)=\frac{G^{-1}(I_i(x))}{V(x)}
+E_{l}=\sum_{p_i \in ref}{||r_k||_{\gamma}}
+\\
+r_k=I_j[p_j]-\frac{t_j e^{a_i}}{t_i e^{a_j}}I_i[p_i]-(b_j - \frac{t_j e^{a_i}}{t_i e^{a_j}} b_i)
 $$</div>
-<p>通过深度思考发现，如果光照恒定的条件下，不同点产生的辐射值<span class="math">\(B_i(x)\)</span>是相同的，但是这里的光度矫正为什么还会存在曝光时间<span class="math">\(t_i\)</span>的影响呢？</p>
-<p>我认为，这种疑问考虑是完全正确的，这里的光度矫正确实没有去掉曝光时间<span class="math">\(t_i\)</span>的影响，但是曝光时间这部分的影响是在优化的能量函数中进行考虑的。能量函数的建模部分我会单独进行讲解，这里只需要记住<code>DSO</code>会在能量函数建模中考虑曝光时间的影响即可。</p>
-<h3 id="22">2.2 无光度参数的解决方案</h3>
-<p>在2.1部分，光度畸变模型中，要求需要对相机的光度参数部分进行标定，这会涉及到渐晕<span class="math">\(V(x)\)</span>的标定、非线性响应函数<span class="math">\(G(I)\)</span>的标定，以及曝光时间的获取。</p>
-<p>然而在实际的数据集中，这些参数绝大部分的数据集是没有的，因此<code>DSO</code>提供了一种无光度参数的解决方案，即使用仿射函数的方式实现模拟光度校正，并且<strong>认定曝光时间<span class="math">\(t_i\)</span>为1</strong>，即：</p>
+<p>其中：</p>
+<ul>
+<li><span class="math">\(p_i\)</span>为跟踪参考关键帧<code>ref frame</code><span class="math">\(l\)</span>层上，带有逆深度的参考点。</li>
+<li><span class="math">\(p_j\)</span>为使用当前优化参数投影到当前帧<span class="math">\(l\)</span>层上的点。</li>
+<li><span class="math">\(E_l\)</span>为<span class="math">\(l\)</span>层金字塔上的能量值，同样也是优化目标函数。</li>
+</ul>
+<p>与<a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">DSO中的优化模型</a>文章中的模型对比发现，跟踪模型并没有使用<code>pattern</code>，这部分也印证了我在1.2小节中的猜测。</p>
+<h4 id="222">2.2.2 雅可比矩阵构建</h4>
+<p>虽然模型没有使用<code>pattern</code>，但是残差部分是一致的，因此雅可比矩阵的构建也完全一致。在前端位姿估计部分，不涉及地图点逆深度的优化问题，因此待优化量主要有当前帧相对于跟踪参考帧的位姿<span class="math">\(T_{cr}\)</span>以及当前帧的光度仿射参数<span class="math">\(a_j\)</span>和<span class="math">\(b_j\)</span>，对于<span class="math">\(a_j\)</span>和<span class="math">\(b_j\)</span>来讲，它们的求导是平凡的，而相对位姿<span class="math">\(T_{cr}\)</span>的求导，我在文章<a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO">DSO中的优化模型</a>中做了详细描述，这里只写出相关结论。</p>
 <div class="math">$$
-I'_i(x) = e^{a_i}I_i(x) - b_i
+\begin{align*}
+    \frac{\partial{r_k}}{\partial{\xi_{ji}}}&amp;=
+    \frac{1}{P_Z'} 
+    \begin{bmatrix} d_x&amp;d_y \end{bmatrix} 
+    \begin{bmatrix} f_x &amp; 0 \\ 0 &amp; f_y \end{bmatrix}
+    \begin{bmatrix}
+        1 &amp; 0 &amp; -\frac{P_X'}{P_Z'} \\
+        0 &amp; 1 &amp; -\frac{P_Y'}{P_Z'} \\
+    \end{bmatrix}
+    \begin{bmatrix}
+        d_{pi}&amp;-P'^{\wedge}
+    \end{bmatrix}\\ &amp;=
+    \begin{bmatrix} d_xf_x&amp;d_yf_y\end{bmatrix}
+    \begin{bmatrix}
+        \frac{d_{pi}}{P_{Z}'} &amp; 0 &amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{X}'}{P_{Z}'} &amp; -\frac{P_{X}'P_{Y}'}{P_{Z}'^2} &amp; 1+\frac{P_{X}^{2}}{P_{Z}^{2}} &amp; -\frac{P_{Y}'}{P_{Z}'} 
+        \\
+        0 &amp; \frac{d_{pi}}{P_{Z}'} &amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{Y}'}{P_{Z}'} &amp; -1-\frac{P_{Y}^{2}}{P_{Z}^{2}} &amp; \frac{P_{X}'P_{Y}'}{P_{Z}^{2}} &amp; \frac{P_{X}'}{P_{Z}'}
+    \end{bmatrix}\\
+    \frac{\partial r_k}{\partial a_j}&amp;=\frac{t_j e^{a_i}}{t_i e^{a_j}}(b_i-I_i[p_i])\\
+    \frac{\partial r_k}{\partial b_j}&amp;=-1
+\end{align*}
 $$</div>
-<p><code>DSO</code>的论文里面还这样描述：这里乘法因子使用<span class="math">\(e^{a_i}\)</span>而不是直接使用<span class="math">\(a_i\)</span>的原因是，使用指数函数，既可以防止其乘法项变为负数，又可以避免因乘法漂移而产生的数值问题。</p>
 <div class="admonition important">
-<p class="admonition-title">注意去畸变的先后顺序</p>
-<p><code>DSO</code>的畸变处理顺序是先进行光度去畸变，在进行像素去畸变，这么做的原因在于，针对渐晕<span class="math">\(V(x)\)</span>的表达形式是与原图大小相同的灰度图，因此如果先进行像素去畸变，然后再进行光度去畸变的话，在消除渐晕部分可能会需要<code>remapX</code>和<code>remapY</code>的映射表来找到一个真实的渐晕位置，这样还会涉及到双线性插值，会导致计算量上的增加。</p>
+<p class="admonition-title">跟踪部分的细节性问题</p>
+<ol>
+<li>计算残差时，采用动态阈值调节的手段，即先确定一个相对可控的残差阈值，然后根据内点比例适当地调整倍率来确保有足够的内点进行优化。当这个可控阈值调整过后，说明某层优化的残差相对较大，为了保证收敛，会对这一层进行再次优化。（调整过阈值的层会优化两次，怀疑内点比例低）</li>
+<li>当某一层优化收敛后，会判断最终的优化RMSE和所有尝试的最小RMSE * 1.5做判断，如果大于1.5倍的最小值，则认定这次尝试直接失败，退出这次尝试，以节省时间，源码中维护这一行为的变量为<code>achieveRes</code>。</li>
+<li>如何判断某次尝试失败与否？<code>DSO</code>从光度仿射参数的相对量和绝对量上判断是否优化成功，<span class="math">\(a_j &gt; 1.2\)</span> 或者 <span class="math">\(b_j &gt; 200\)</span>则失败，<span class="math">\(a_{ji}&gt;1.5\)</span>或者<span class="math">\(b_{ji}&gt;200\)</span>则认为失败。</li>
+<li>如何提前退出尝试？从2.1节的介绍中可以发现，一共有<span class="math">\((3 * 3 * 3 - 1) * 3 + 4 = 82\)</span>次尝试，<code>DSO</code>为了避免多次尝试导致的时间浪费问题，会使用上一帧优化能量值 * 1.5 作为退出尝试的条件，当然这样就可能导致动态阈值一直增大的情况。<code>DSO</code>在<strong>关键帧判断</strong>中对这个问题做了约束，保证了动态阈值增长的上限（<strong>见本章第3节</strong>）。</li>
+</ol>
 </div>
+<h2 id="3">3. 关键帧判断（跟踪后处理）</h2>
+<p>在关键帧的判断中，除了通常考虑的<strong>时间间隔</strong>和<strong>空间间隔</strong>外，<code>DSO</code>还考虑了<strong>光度变化</strong>和用来提前退出尝试的跟踪<strong>能量阈值</strong>。</p>
+<ul>
+<li><code>DSO</code>中考虑的时间间隔相对普通，会人为限定一个创建关键帧的最大时间间隔，在<code>DSO</code>的源码中默认是<strong>不开启</strong>这个配置的。</li>
+<li><code>DSO</code>考虑的空间间隔相对新颖，不是所谓的真实距离，而是考虑了某些位姿间隔条件下的<strong>平均光流</strong>大小（金字塔第0层）。我们知道两张图像的平均光流大小可以近似的代表两张图像之间的视差，光流越大，视差越大，两张图片的重叠部分越少，反之亦然。<code>DSO</code>使用<span class="math">\(T_{cr}\)</span>中的<span class="math">\(t_{cr}\)</span>、<span class="math">\(-t_{cr}\)</span>、<span class="math">\(T_{cr}\)</span>和<span class="math">\([R_{cr},t_{cr}]\)</span>四种位姿导致的平均光流，配合自定义权重判断是否需要创建关键帧。使用四种位姿的平均光流而不是仅仅<span class="math">\(T_{cr}\)</span>造成的平均光流，我<strong>猜测</strong>可能是因为使用四种位姿可以在一定程度上模拟之后一段时间内的运动状态，从而做到提前判断。</li>
+<li><code>DSO</code>使用了基于光度仿射参数的直接法，因此当相对仿射参数<span class="math">\(a_{ji}\)</span>变化较大时，代表着当前帧和参考关键帧之间的<strong>光照条件</strong>发生了相对较大的变化，因此需要及时创建关键帧防止跟踪丢失情况的发生。</li>
+<li>在第2小节的末尾，做了一些跟踪细节方面的讨论，提到了提前退出尝试的动态阈值可能会<strong>持续增大</strong>，从而导致阈值限定意义失效，<code>DSO</code>为了防止这种情况的发生，会提前记录基于当前参考关键帧第一次跟踪成功的能量值，如果当前帧跟踪阈值超过了这个值的2倍，则认定需要创建关键帧了，这么做相当于对动态阈值的上限做了规定。</li>
+</ul>
 <script type="text/javascript">if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
     var align = "center",
         indent = "0em",
@@ -274,9 +270,9 @@ $$</div>
  
                 <p id="post-share-links">
     喜欢这篇文章吗？喜欢就分享吧:
-      <a href="https://twitter.com/intent/tweet?text=DSO%E4%B8%AD%E7%9A%84%E5%8E%BB%E7%95%B8%E5%8F%98%E6%93%8D%E4%BD%9C&url=https%3A//sunshanlu.github.io/dso_ssl/De-distortion-in-DSO&hashtags=vslam,dso,robot" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
- ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
- ❄       <a href="mailto:?subject=DSO%E4%B8%AD%E7%9A%84%E5%8E%BB%E7%95%B8%E5%8F%98%E6%93%8D%E4%BD%9C&amp;body=https%3A//sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
+      <a href="https://twitter.com/intent/tweet?text=DSO%E7%9A%84%E5%89%8D%E7%AB%AF%E8%B7%9F%E8%B8%AA&url=https%3A//sunshanlu.github.io/dso_ssl/Track-frame-in-DSO&hashtags=vslam,dso,robot" target="_blank" rel="nofollow noopener noreferrer" title="Share on Twitter">Twitter</a>
+ ❄       <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A//sunshanlu.github.io/dso_ssl/Track-frame-in-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share on Facebook">Facebook</a>
+ ❄       <a href="mailto:?subject=DSO%E7%9A%84%E5%89%8D%E7%AB%AF%E8%B7%9F%E8%B8%AA&amp;body=https%3A//sunshanlu.github.io/dso_ssl/Track-frame-in-DSO" target="_blank" rel="nofollow noopener noreferrer" title="Share via Email">Email</a>
 
                 <hr />
     <div class="author-blurb">
@@ -312,7 +308,7 @@ $$</div>
                 <a class="accordion-toggle disqus-comment-count comment-count collapsed"
                    data-toggle="collapse"
                    data-parent="#accordion2"
-                   href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO#comment_thread"
+                   href="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO#comment_thread"
                    id="comment-accordion-toggle">
                     Comments
                 </a>
@@ -323,7 +319,7 @@ $$</div>
 
                         <script src="https://utteranc.es/client.js"
         data-repo="sunshanlu/dso_ssl"
-        data-issue-term="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"
+        data-issue-term="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO"
         data-label="✨💬✨"
         data-theme="github-light"
         crossorigin="anonymous"
@@ -344,25 +340,24 @@ $$</div>
     <h2>Keep Reading</h2>
 <ul class="related-posts-list">
 <li><a href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO" title="DSO的算法优势">DSO的算法优势</a></li>
+<li><a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO" title="DSO中的去畸变操作">DSO中的去畸变操作</a></li>
 <li><a href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO" title="DSO中的点选策略">DSO中的点选策略</a></li>
 <li><a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO" title="DSO中的优化模型">DSO中的优化模型</a></li>
 <li><a href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO" title="DSO中的初始化">DSO中的初始化</a></li>
-<li><a href="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO" title="DSO的前端跟踪">DSO的前端跟踪</a></li>
 </ul>
 <hr />
 </section>
             <aside>
             <nav>
             <ul class="articles-timeline">
-                <li class="previous-article">« <a href="https://sunshanlu.github.io/dso_ssl/Advantages-of-DSO" title="Previous: DSO的算法优势">DSO的算法优势</a></li>
-                <li class="next-article"><a href="https://sunshanlu.github.io/dso_ssl/Point-select-in-DSO" title="Next: DSO中的点选策略">DSO中的点选策略</a> »</li>
+                <li class="previous-article">« <a href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO" title="Previous: DSO中的初始化">DSO中的初始化</a></li>
             </ul>
             </nav>
             </aside>
         </div>
         <section id="article-sidebar" class="span2">
             <h4>Published</h4>
-            <time itemprop="dateCreated" datetime="2025-01-09T00:00:00+08:00">2025-01-09</time>
+            <time itemprop="dateCreated" datetime="2025-02-18T00:00:00+08:00">2025-02-18</time>
             <h4>Category</h4>
             <a class="category-link" href="https://sunshanlu.github.io/dso_ssl/categories#dso-ref">DSO</a>
             <h4>Tags</h4>

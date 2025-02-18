@@ -1,5 +1,152 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/all-en.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-01-16T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO中的初始化</title><link href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO" rel="alternate"></link><published>2025-01-16T00:00:00+08:00</published><updated>2025-01-16T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-16:/dso_ssl/Initialization-of-DSO</id><summary type="html">
+<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/all-en.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-02-18T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO的前端跟踪</title><link href="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO" rel="alternate"></link><published>2025-02-18T00:00:00+08:00</published><updated>2025-02-18T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-02-18:/dso_ssl/Track-frame-in-DSO</id><summary type="html">
+&lt;p&gt;DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍 …&lt;/p&gt;</summary><content type="html">
+&lt;p&gt;DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍。&lt;/p&gt;
+&lt;h2 id="1"&gt;1. 参考帧确定和跟踪参考点构建（跟踪前处理）&lt;/h2&gt;
+&lt;p&gt;当DSO系统的初始化完成后，目前整个系统中会有&lt;strong&gt;两个关键帧&lt;/strong&gt;和&lt;strong&gt;若干激活地图点&lt;/strong&gt;，当然激活地图点的&lt;code&gt;host&lt;/code&gt;帧为初始化参考帧。和初始化过程类似，由于新来的一帧&lt;code&gt;frame&lt;/code&gt;的位姿不明确，需要一个相对鲁邦的位姿估计方法，和初始化过程一样，&lt;code&gt;DSO&lt;/code&gt;的前端跟踪部分采用的也是基于金字塔由粗至精的跟踪方法，因此需要确定一个跟踪参考帧和若干跟踪地图点。&lt;/p&gt;
+&lt;p&gt;在介绍参考点构建之前，我先明确一个问题，就是&lt;code&gt;DSO&lt;/code&gt;系统会维护一个&lt;strong&gt;关键帧队列&lt;/strong&gt;，即&lt;code&gt;DSO&lt;/code&gt;中的关键帧&lt;strong&gt;滑动窗口&lt;/strong&gt;，至于这个滑窗的维护策略，我会在后续文章中进行介绍。&lt;/p&gt;
+&lt;h3 id="11"&gt;1.1 金字塔参考点初构建&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;使用了最新关键帧作为跟踪过程中的参考关键帧。为了提高跟踪鲁棒性，滑动窗口中的所有激活地图点都会投影到最新关键帧的第0层上。正如下面这个图所描述的那样，来初始化跟踪参考关键帧上第0层的像素点逆深度。&lt;/p&gt;
+&lt;p&gt;在投影过程中，&lt;code&gt;DSO&lt;/code&gt;系统使用了四舍五入的方式来计算投影点的像素位置，因此存在多个点投影到同一个像素位置的情况，这里使用&lt;a href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO#33"&gt;DSO中的初始化的3.3节&lt;/a&gt;讲到的高斯归一化积解决同像素位置不同逆深度的问题。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/point-build.png" width="70%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;根据跟踪参考帧第0层上的像素逆深度点，向上层进行投影得到参考帧第1层的像素逆深度点，以此类推最终得到初步的跟踪参考点逆深度，这里同样会存在多对一的情况，依然使用高斯归一化积解决。&lt;/p&gt;
+&lt;h3 id="12"&gt;1.2 金字塔参考点膨胀&lt;/h3&gt;
+&lt;p&gt;除了使用上述投影方式，&lt;code&gt;DSO&lt;/code&gt;的源码中使用了膨胀手段来进一步增加参考点的数目，正如下图所示，紫色的位置代表某个金字塔层级上没有逆深度点的像素位置，而青色位置代表膨胀遍历位置，即遍历青色位置试图寻找一个有逆深度的像素点，然后使用取均值的方式再紫色位置膨胀出逆深度点出来。下图是&lt;code&gt;DSO&lt;/code&gt;中采用的两种膨胀遍历方式，左侧是金字塔0层和1层的膨胀方式，右侧是其他层的膨胀方式。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/point-swell.png" width="70%"/&gt;
+&lt;/div&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;膨胀点原因猜测&lt;/p&gt;
+&lt;p&gt;这里膨胀点的方式和我在&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中提到的&lt;code&gt;pattern&lt;/code&gt;类似，&lt;code&gt;pattern&lt;/code&gt;的作用是使用周围像素共享中心点的逆深度，以此来增强灰度不变形假设的可行性。个人猜测&lt;code&gt;DSO&lt;/code&gt;在这里使用膨胀的原因和&lt;code&gt;pattern&lt;/code&gt;类似，尝试以这种方式提高假设的可靠性。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h2 id="2"&gt;2. 实施跟踪过程（构建模型并优化）&lt;/h2&gt;
+&lt;p&gt;有了参考帧和待跟踪的参考点后，就可以实施前端跟踪过程了。除了使用图像金字塔从粗到精的跟踪手段外，&lt;code&gt;DSO&lt;/code&gt;还拓展了不同的运动假设来构建优化初值假设库，试图找到一个最优初值，从而加速优化过程，提高达到最优值的可能性。&lt;/p&gt;
+&lt;h3 id="21"&gt;2.1 构建优化初值假设库&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;考虑了&lt;strong&gt;恒速运动&lt;/strong&gt;、&lt;strong&gt;倍数运动&lt;/strong&gt;、&lt;strong&gt;半速运动&lt;/strong&gt;和&lt;strong&gt;相对参考帧静止&lt;/strong&gt;的模型假设，除此之外&lt;code&gt;DSO&lt;/code&gt;还做了&lt;strong&gt;小旋转运行假设&lt;/strong&gt;，所有的运动假设模型我都在下面的图片里面表示了出来，共有&lt;span class="math"&gt;\((3 * 3 * 3 - 1) * 3 + 4\)&lt;/span&gt;种假设结果。其中待优化帧的光度仿射参数&lt;span class="math"&gt;\(a_j\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_j\)&lt;/span&gt;直接使用的上一帧光度仿射参数&lt;span class="math"&gt;\(a_{last}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{last}\)&lt;/span&gt;作为初值，这是因为自然条件下，相邻帧之间的光度仿射参数变化非常小。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/pose-assume.png" width="95%"/&gt;
+&lt;/div&gt;
+&lt;h3 id="22"&gt;2.2 基于某种假设的跟踪尝试&lt;/h3&gt;
+&lt;h4 id="221"&gt;2.2.1 跟踪模型&lt;/h4&gt;
+&lt;p&gt;某种位姿假设初值&lt;span class="math"&gt;\(T_{cr}\)&lt;/span&gt;确定后，&lt;code&gt;DSO&lt;/code&gt;前端跟踪部分会使用下面的公式构造优化目标函数。&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_{l}=\sum_{p_i \in ref}{||r_k||_{\gamma}}
+\\
+r_k=I_j[p_j]-\frac{t_j e^{a_i}}{t_i e^{a_j}}I_i[p_i]-(b_j - \frac{t_j e^{a_i}}{t_i e^{a_j}} b_i)
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;为跟踪参考关键帧&lt;code&gt;ref frame&lt;/code&gt;&lt;span class="math"&gt;\(l\)&lt;/span&gt;层上，带有逆深度的参考点。&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;为使用当前优化参数投影到当前帧&lt;span class="math"&gt;\(l\)&lt;/span&gt;层上的点。&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_l\)&lt;/span&gt;为&lt;span class="math"&gt;\(l\)&lt;/span&gt;层金字塔上的能量值，同样也是优化目标函数。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;与&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中的模型对比发现，跟踪模型并没有使用&lt;code&gt;pattern&lt;/code&gt;，这部分也印证了我在1.2小节中的猜测。&lt;/p&gt;
+&lt;h4 id="222"&gt;2.2.2 雅可比矩阵构建&lt;/h4&gt;
+&lt;p&gt;虽然模型没有使用&lt;code&gt;pattern&lt;/code&gt;，但是残差部分是一致的，因此雅可比矩阵的构建也完全一致。在前端位姿估计部分，不涉及地图点逆深度的优化问题，因此待优化量主要有当前帧相对于跟踪参考帧的位姿&lt;span class="math"&gt;\(T_{cr}\)&lt;/span&gt;以及当前帧的光度仿射参数&lt;span class="math"&gt;\(a_j\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_j\)&lt;/span&gt;，对于&lt;span class="math"&gt;\(a_j\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_j\)&lt;/span&gt;来讲，它们的求导是平凡的，而相对位姿&lt;span class="math"&gt;\(T_{cr}\)&lt;/span&gt;的求导，我在文章&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;中做了详细描述，这里只写出相关结论。&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\begin{align*}
+    \frac{\partial{r_k}}{\partial{\xi_{ji}}}&amp;amp;=
+    \frac{1}{P_Z'} 
+    \begin{bmatrix} d_x&amp;amp;d_y \end{bmatrix} 
+    \begin{bmatrix} f_x &amp;amp; 0 \\ 0 &amp;amp; f_y \end{bmatrix}
+    \begin{bmatrix}
+        1 &amp;amp; 0 &amp;amp; -\frac{P_X'}{P_Z'} \\
+        0 &amp;amp; 1 &amp;amp; -\frac{P_Y'}{P_Z'} \\
+    \end{bmatrix}
+    \begin{bmatrix}
+        d_{pi}&amp;amp;-P'^{\wedge}
+    \end{bmatrix}\\ &amp;amp;=
+    \begin{bmatrix} d_xf_x&amp;amp;d_yf_y\end{bmatrix}
+    \begin{bmatrix}
+        \frac{d_{pi}}{P_{Z}'} &amp;amp; 0 &amp;amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{X}'}{P_{Z}'} &amp;amp; -\frac{P_{X}'P_{Y}'}{P_{Z}'^2} &amp;amp; 1+\frac{P_{X}^{2}}{P_{Z}^{2}} &amp;amp; -\frac{P_{Y}'}{P_{Z}'} 
+        \\
+        0 &amp;amp; \frac{d_{pi}}{P_{Z}'} &amp;amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{Y}'}{P_{Z}'} &amp;amp; -1-\frac{P_{Y}^{2}}{P_{Z}^{2}} &amp;amp; \frac{P_{X}'P_{Y}'}{P_{Z}^{2}} &amp;amp; \frac{P_{X}'}{P_{Z}'}
+    \end{bmatrix}\\
+    \frac{\partial r_k}{\partial a_j}&amp;amp;=\frac{t_j e^{a_i}}{t_i e^{a_j}}(b_i-I_i[p_i])\\
+    \frac{\partial r_k}{\partial b_j}&amp;amp;=-1
+\end{align*}
+$$&lt;/div&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;跟踪部分的细节性问题&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;计算残差时，采用动态阈值调节的手段，即先确定一个相对可控的残差阈值，然后根据内点比例适当地调整倍率来确保有足够的内点进行优化。当这个可控阈值调整过后，说明某层优化的残差相对较大，为了保证收敛，会对这一层进行再次优化。（调整过阈值的层会优化两次，怀疑内点比例低）&lt;/li&gt;
+&lt;li&gt;当某一层优化收敛后，会判断最终的优化RMSE和所有尝试的最小RMSE * 1.5做判断，如果大于1.5倍的最小值，则认定这次尝试直接失败，退出这次尝试，以节省时间，源码中维护这一行为的变量为&lt;code&gt;achieveRes&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;如何判断某次尝试失败与否？&lt;code&gt;DSO&lt;/code&gt;从光度仿射参数的相对量和绝对量上判断是否优化成功，&lt;span class="math"&gt;\(a_j &amp;gt; 1.2\)&lt;/span&gt; 或者 &lt;span class="math"&gt;\(b_j &amp;gt; 200\)&lt;/span&gt;则失败，&lt;span class="math"&gt;\(a_{ji}&amp;gt;1.5\)&lt;/span&gt;或者&lt;span class="math"&gt;\(b_{ji}&amp;gt;200\)&lt;/span&gt;则认为失败。&lt;/li&gt;
+&lt;li&gt;如何提前退出尝试？从2.1节的介绍中可以发现，一共有&lt;span class="math"&gt;\((3 * 3 * 3 - 1) * 3 + 4 = 82\)&lt;/span&gt;次尝试，&lt;code&gt;DSO&lt;/code&gt;为了避免多次尝试导致的时间浪费问题，会使用上一帧优化能量值 * 1.5 作为退出尝试的条件，当然这样就可能导致动态阈值一直增大的情况。&lt;code&gt;DSO&lt;/code&gt;在&lt;strong&gt;关键帧判断&lt;/strong&gt;中对这个问题做了约束，保证了动态阈值增长的上限（&lt;strong&gt;见本章第3节&lt;/strong&gt;）。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+&lt;h2 id="3"&gt;3. 关键帧判断（跟踪后处理）&lt;/h2&gt;
+&lt;p&gt;在关键帧的判断中，除了通常考虑的&lt;strong&gt;时间间隔&lt;/strong&gt;和&lt;strong&gt;空间间隔&lt;/strong&gt;外，&lt;code&gt;DSO&lt;/code&gt;还考虑了&lt;strong&gt;光度变化&lt;/strong&gt;和用来提前退出尝试的跟踪&lt;strong&gt;能量阈值&lt;/strong&gt;。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DSO&lt;/code&gt;中考虑的时间间隔相对普通，会人为限定一个创建关键帧的最大时间间隔，在&lt;code&gt;DSO&lt;/code&gt;的源码中默认是&lt;strong&gt;不开启&lt;/strong&gt;这个配置的。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DSO&lt;/code&gt;考虑的空间间隔相对新颖，不是所谓的真实距离，而是考虑了某些位姿间隔条件下的&lt;strong&gt;平均光流&lt;/strong&gt;大小（金字塔第0层）。我们知道两张图像的平均光流大小可以近似的代表两张图像之间的视差，光流越大，视差越大，两张图片的重叠部分越少，反之亦然。&lt;code&gt;DSO&lt;/code&gt;使用&lt;span class="math"&gt;\(T_{cr}\)&lt;/span&gt;中的&lt;span class="math"&gt;\(t_{cr}\)&lt;/span&gt;、&lt;span class="math"&gt;\(-t_{cr}\)&lt;/span&gt;、&lt;span class="math"&gt;\(T_{cr}\)&lt;/span&gt;和&lt;span class="math"&gt;\([R_{cr},t_{cr}]\)&lt;/span&gt;四种位姿导致的平均光流，配合自定义权重判断是否需要创建关键帧。使用四种位姿的平均光流而不是仅仅&lt;span class="math"&gt;\(T_{cr}\)&lt;/span&gt;造成的平均光流，我&lt;strong&gt;猜测&lt;/strong&gt;可能是因为使用四种位姿可以在一定程度上模拟之后一段时间内的运动状态，从而做到提前判断。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DSO&lt;/code&gt;使用了基于光度仿射参数的直接法，因此当相对仿射参数&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;变化较大时，代表着当前帧和参考关键帧之间的&lt;strong&gt;光照条件&lt;/strong&gt;发生了相对较大的变化，因此需要及时创建关键帧防止跟踪丢失情况的发生。&lt;/li&gt;
+&lt;li&gt;在第2小节的末尾，做了一些跟踪细节方面的讨论，提到了提前退出尝试的动态阈值可能会&lt;strong&gt;持续增大&lt;/strong&gt;，从而导致阈值限定意义失效，&lt;code&gt;DSO&lt;/code&gt;为了防止这种情况的发生，会提前记录基于当前参考关键帧第一次跟踪成功的能量值，如果当前帧跟踪阈值超过了这个值的2倍，则认定需要创建关键帧了，这么做相当于对动态阈值的上限做了规定。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry><entry><title>DSO中的初始化</title><link href="https://sunshanlu.github.io/dso_ssl/Initialization-of-DSO" rel="alternate"></link><published>2025-01-16T00:00:00+08:00</published><updated>2025-01-16T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-01-16:/dso_ssl/Initialization-of-DSO</id><summary type="html">
 &lt;p&gt;在这篇文章中，我会对&lt;code&gt;DSO&lt;/code&gt;初始化的过程和初始化中的一些&lt;strong&gt;要点&lt;/strong&gt;进行讲解说明。作为一个单目视觉&lt;code&gt;VO&lt;/code&gt;系统，&lt;code&gt;DSO&lt;/code&gt;也采用了多帧 …&lt;/p&gt;</summary><content type="html">
 &lt;p&gt;在这篇文章中，我会对&lt;code&gt;DSO&lt;/code&gt;初始化的过程和初始化中的一些&lt;strong&gt;要点&lt;/strong&gt;进行讲解说明。作为一个单目视觉&lt;code&gt;VO&lt;/code&gt;系统，&lt;code&gt;DSO&lt;/code&gt;也采用了多帧初始化的策略，即首先在初始化参考帧上进行提点操作，然后根据不同的帧来优化初始化参考帧上点的逆深度估计，初始化的优化模型是在&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中提到的优化模型基础上，考虑了&lt;strong&gt;逆深度的连续性&lt;/strong&gt;和&lt;strong&gt;平移距离&lt;/strong&gt;构建的，并且使用了&lt;code&gt;Schur&lt;/code&gt;&lt;strong&gt;消元&lt;/strong&gt;来加速初始化中的优化过程。&lt;/p&gt;
 &lt;p&gt;在&lt;code&gt;DSO&lt;/code&gt;的初始化过程中还使用了图像金字塔（从粗到精的优化）来提高鲁棒性，并构建点的同层相邻点和上层父点之间的联系，实现点的逆深度传递。除此之外，&lt;code&gt;DSO&lt;/code&gt;在初始化过程中还对相对光度仿射参数进行了处理，下面是我对这些要点的详细说明：&lt;/p&gt;
