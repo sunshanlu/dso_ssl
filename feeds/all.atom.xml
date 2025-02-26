@@ -1,5 +1,499 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/all.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-02-18T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO的前端跟踪</title><link href="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO" rel="alternate"></link><published>2025-02-18T00:00:00+08:00</published><updated>2025-02-18T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-02-18:/dso_ssl/Track-frame-in-DSO</id><summary type="html">
+<feed xmlns="http://www.w3.org/2005/Atom"><title>SSL的SLAM系列 - DSO</title><link href="https://sunshanlu.github.io/dso_ssl/" rel="alternate"></link><link href="https://sunshanlu.github.io/dso_ssl/feeds/all.atom.xml" rel="self"></link><id>https://sunshanlu.github.io/dso_ssl/</id><updated>2025-02-20T00:00:00+08:00</updated><subtitle>最好的DSO解析系列</subtitle><entry><title>DSO后端建图（滑窗优化）</title><link href="https://sunshanlu.github.io/dso_ssl/SWF-in-DSO" rel="alternate"></link><published>2025-02-20T00:00:00+08:00</published><updated>2025-02-20T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-02-20:/dso_ssl/SWF-in-DSO</id><summary type="html">
+&lt;p&gt;当前端跟踪完成后，前端线程会判断是否需要添加关键帧操作，并向后端发送跟踪完成的当前帧，如果不需要添加关键帧 …&lt;/p&gt;</summary><content type="html">
+&lt;p&gt;当前端跟踪完成后，前端线程会判断是否需要添加关键帧操作，并向后端发送跟踪完成的当前帧，如果不需要添加关键帧，那么可以根据当前帧的位姿信息对滑窗中的&lt;strong&gt;未成熟&lt;/strong&gt;点进行&lt;strong&gt;优化更新&lt;/strong&gt;；当然如果需要添加关键帧的话也需要根据位姿信息对滑窗中的&lt;strong&gt;未成熟&lt;/strong&gt;点进行优化更新，除此之外还需要根据当前滑窗中的状态&lt;strong&gt;激活相当一部分的未成熟点&lt;code&gt;ImmaturePoint&lt;/code&gt;&lt;/strong&gt;，然后根据滑窗中的成熟点&lt;code&gt;PointHessian&lt;/code&gt;、关键帧、先验信息以及由系统之前&lt;strong&gt;边缘化&lt;/strong&gt;&lt;code&gt;marg&lt;/code&gt;的&lt;code&gt;fill-in&lt;/code&gt;信息构建最小二乘的&lt;strong&gt;图优化&lt;/strong&gt;问题，当然这里会涉及到一些优化理论知识，比如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DSO&lt;/code&gt;使用&lt;strong&gt;First Estimate Jacobian &lt;code&gt;FEJ&lt;/code&gt;&lt;/strong&gt;，解决由于不同优化初值导致的系统&lt;strong&gt;不一致性&lt;/strong&gt;问题。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DSO&lt;/code&gt;使用 &lt;strong&gt;&lt;code&gt;SVD&lt;/code&gt;分解&lt;/strong&gt; 求正规方程或者使用向&lt;strong&gt;零空间投影&lt;/strong&gt;的方式求解最小二乘问题，来防止解在零空间中漂移的问题。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;DSO&lt;/code&gt;使用矩阵伴随的性质，构建&lt;span class="math"&gt;\(\frac{\partial \delta \xi_{ji}}{\partial \delta \xi_j}\)&lt;/span&gt;和&lt;span class="math"&gt;\(\frac{\partial \delta \xi_{ji}}{\partial \delta \xi_i}\)&lt;/span&gt;以此来解决相对增量到绝对增量的转换问题（这是由于残差定义仅包含相对位姿导致的问题）。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;最后，&lt;code&gt;DSO&lt;/code&gt;定义了一些高效的帧管理和点管理策略，使用某些条件筛选需要被边缘化掉的帧和点，以此构建滑动窗口的边缘化信息&lt;code&gt;HM&lt;/code&gt;和&lt;code&gt;bM&lt;/code&gt;。&lt;/p&gt;
+&lt;h2 id="1"&gt;1. 滑窗优化里面到底在做什么？&lt;/h2&gt;
+&lt;p&gt;首先，当前端线程完成对&lt;code&gt;Frame&lt;/code&gt;的位姿估计后，需要后端线程根据估计的&lt;code&gt;Frame&lt;/code&gt;位姿进行滑动窗口中未成熟点&lt;code&gt;ImmaturePoint&lt;/code&gt;的逆深度更新，具体更新逆深度的手段，我会在第2小节中进行说明。如果前端线程判断滑动窗口中不需要添加关键帧，那么后端线程结束；否则，后端线程进入滑动窗口优化阶段。为了保证滑窗中&lt;strong&gt;激活点&lt;code&gt;PointHessian&lt;/code&gt;&lt;/strong&gt; 的密度问题，需要对滑动窗口中作为备选力量的&lt;strong&gt;未成熟点&lt;code&gt;ImmaturePoint&lt;/code&gt;&lt;/strong&gt; 进行筛选激活，而筛选激活的策略，我会在第3小节中进行说明。当滑动窗口中激活点达到数量要求后，构建残差（根据&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章描述的残差公式构建），然后在考虑&lt;strong&gt;残差作用&lt;/strong&gt;、&lt;strong&gt;先验作用&lt;/strong&gt;、&lt;strong&gt;&lt;code&gt;marg&lt;/code&gt;作用&lt;/strong&gt;后构建并迭代求解优化的正规方程&lt;code&gt;H&lt;/code&gt;和&lt;code&gt;b&lt;/code&gt;，滑窗正规方程的构建过程以及构建求解过程中可能出现的问题，我会在第4小节中进行详细描述；最后为了保证求解的实时性，需要严格控制滑动窗口中的规模，&lt;code&gt;DSO&lt;/code&gt;使用边缘化的策略来实现，其中会涉及边缘化判断和实施边缘化操作这两个过程来构建边缘化的&lt;span class="math"&gt;\(H_M\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;，以供后续滑窗优化使用，我会在第5小节中对边缘化相关内容进行详细描述。整个后端的运行逻辑如下图所示：&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/swt.png" width="70%"/&gt;
+&lt;/div&gt;
+&lt;h2 id="2"&gt;2 普通帧和关键帧都要做的未成熟点优化&lt;/h2&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;中的未成熟点优化过程分两个步骤进行，首先需要通过未成熟点的逆深度范围确定的&lt;strong&gt;极线线段上搜索&lt;/strong&gt;一个能量最小的像素点；接下来根据线搜过程以及残差公式&lt;strong&gt;构建优化模型&lt;/strong&gt;，因为残差和待优化量都是标量，因此优化过程可以非常快，整个未成熟点优化过程如下图所示：&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/polar-search.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;h3 id="21"&gt;2.1 极线搜索&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;中的极线搜索与&lt;strong&gt;视觉SLAM十四讲p309&lt;/strong&gt;中讲解极线搜索内容基本一致，只不过是块匹配策略不一致而已，在SLAM十四讲中列举了&lt;code&gt;SAD&lt;/code&gt;、&lt;code&gt;SSD&lt;/code&gt;和&lt;code&gt;NCC&lt;/code&gt;块匹配评价方法，而&lt;code&gt;DSO&lt;/code&gt;使用的是其&lt;code&gt;pattern&lt;/code&gt;根据残差构建能量值来作为极线搜索的块匹配评价方法，&lt;code&gt;DSO&lt;/code&gt;使用构建残差能量值的方式也会为&lt;strong&gt;基于极线搜索优化&lt;/strong&gt;过程提供方便。&lt;/p&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;&lt;code&gt;DSO&lt;/code&gt;极线搜索中的小问题&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;code&gt;pattern&lt;/code&gt; 在线搜过程如何保证？ 在SLAM十四讲中，提到了块匹配技术，也就是说以投影点和被投影点为中心，与周围的某些固定点之间构建两个图像块，以此来进行极线搜索过程中的匹配区域。但是&lt;code&gt;DSO&lt;/code&gt;有固定的&lt;code&gt;pattern&lt;/code&gt;，但是根据投影公式分析可知&lt;span class="math"&gt;\(p_j=KRK^{-1}p_i + Ktd_{pi}\)&lt;/span&gt;，在搜索过程中，&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;是未知的，所以投影点&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;和被投影点&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;没有明确的&lt;code&gt;pattern&lt;/code&gt;对应。&lt;code&gt;DSO&lt;/code&gt;使用了&lt;span class="math"&gt;\(KRK^{-1}\)&lt;/span&gt;矩阵的左上&lt;span class="math"&gt;\(2\times2\)&lt;/span&gt;矩阵和&lt;code&gt;pattern&lt;/code&gt;相对量的乘积来近似代表&lt;code&gt;pattern&lt;/code&gt;与&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;点的相对位置。&lt;/li&gt;
+&lt;li&gt;线搜起止点如何确定？&lt;code&gt;DSO&lt;/code&gt;使用了未成熟点的&lt;code&gt;idepth_min&lt;/code&gt; 和 &lt;code&gt;idepth_max&lt;/code&gt; 对应的点作为搜索的起止点，当然&lt;code&gt;idepth_min&lt;/code&gt;被初始化为0，&lt;code&gt;idepth_max&lt;/code&gt;被初始化为&lt;code&gt;NAN&lt;/code&gt;，如果&lt;code&gt;idepth_max&lt;/code&gt;为&lt;code&gt;NAN&lt;/code&gt;,则通过图像的(&lt;code&gt;width&lt;/code&gt; + &lt;code&gt;height&lt;/code&gt;) * &lt;code&gt;super_param&lt;/code&gt;来确定一个&lt;strong&gt;搜索长度&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+&lt;p&gt;除此之外，&lt;code&gt;DSO&lt;/code&gt;还讨论了极线搜索和梯度的关系，&lt;strong&gt;我在网络上找到了相关的解释&lt;/strong&gt;，根据下面的图像进行分析，图中红色实线代表的是根据当前帧位姿得到的极线，而红色虚线代表真实位姿得到的极线，蓝色的线代表的是像素值等值线（垂直于像素梯度），这里假设虚线上浅蓝色点为真实的匹配点，而实线上浅蓝色点是在误差极线上搜索到的匹配点。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;左图是极线和梯度平行时，可能会导致的像素误差。可以发现，总体的像素误差主要由极线误差导致。&lt;/li&gt;
+&lt;li&gt;右图是极线和梯度之间存在角度差时，可能会导致的像素误差，可以发现，整体像素误差除了有一部分来自极线误差外，还有一部分来自梯度的误差。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/pixel-error.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;源码中使用了一个经验公式，来计算像素误差的大小，经验公式如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+e_p = 0.2 + 0.2 \times \frac{a + b}{a}\\
+a = (lx \times dx + ly \times dy)^2\\
+b = (lx \times dx - ly \times dy)^2
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(lx\)&lt;/span&gt;为极线在&lt;span class="math"&gt;\(x\)&lt;/span&gt;方向上的分量&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(ly\)&lt;/span&gt;为极线在&lt;span class="math"&gt;\(y\)&lt;/span&gt;方向上的分量&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(dx\)&lt;/span&gt;为梯度在&lt;span class="math"&gt;\(x\)&lt;/span&gt;方向上的向量&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(dy\)&lt;/span&gt;为梯度在&lt;span class="math"&gt;\(y\)&lt;/span&gt;方向上的向量&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;经过推导不难发现，&lt;span class="math"&gt;\(e_p=0.2 + \frac{0.2}{\cos^2&amp;lt;l,d&amp;gt;}\)&lt;/span&gt;，其中&lt;span class="math"&gt;\(cos&amp;lt;l,d&amp;gt;\)&lt;/span&gt;为极线与梯度之间的夹角的余弦值，也就是说极线和梯度之间的夹角越大就会导致像素误差越大，并且最小的像素误差为&lt;code&gt;0.4px&lt;/code&gt;。这与我在上面的定性分析结果一致。&lt;/p&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;极线搜索与梯度关系，定性分析存在的问题&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;位姿误差是如何影响极线的呢？在图像上看来，误差极线和真实极线之间是平行的。通过视觉SLAM十四讲中的推导可以知道，极线搜索的线段参数可以使用&lt;span class="math"&gt;\(Fp_1\)&lt;/span&gt;来表示，其中F为基础矩阵，&lt;span class="math"&gt;\(p_1\)&lt;/span&gt;为host帧上的像素点。而&lt;span class="math"&gt;\(F\)&lt;/span&gt;矩阵可以使用&lt;span class="math"&gt;\(F=K^{-T}t^{\wedge}RK^{-1}\)&lt;/span&gt;表示，我从这个公式上很难判断出位姿误差会导致平行的极线误差。&lt;/li&gt;
+&lt;li&gt;以真实匹配点为起点的图像等值线与误差极线的交点是否能保证与误差极线上搜索的点一致？我认为在极线误差较小的情况下，这个是可以成立的，因为真实匹配点能近似代表误差最小点处，而图像等值线在较小的像素范围内可以看做近似成立，因此误差极线上的点也能近似代表误差最小点处。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;
+&lt;h3 id="22"&gt;2.2 基于极线搜索优化&lt;/h3&gt;
+&lt;p&gt;线搜结束后，可以得到一个粗略的最优值（因为线搜会有步长，以至于找不到全局最优值），因此需要优化过程来逼近极线上的最优值对应的&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;点。线搜过程和残差可以通过下面的公式进行表示：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+r_k=I_j[p_j]- a_{ji} I_i[p_i] - b_{ji}\\
+p_j=l*\delta + p_{j0}
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;为极线搜索的目标点；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(l\)&lt;/span&gt;为极线方向；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(p_{j0}\)&lt;/span&gt;为极线搜索结束后确定的&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;点；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\delta\)&lt;/span&gt;为极线上最优点的&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;到当前&lt;span class="math"&gt;\(p_{j0}\)&lt;/span&gt;之间的步长（待优化量）；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;那么不难推导，残差相对步长&lt;span class="math"&gt;\(\delta\)&lt;/span&gt;的雅可比矩阵如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\frac{\partial r_k}{\partial \delta}=g^T l
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(g\)&lt;/span&gt;为&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;点的梯度值；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(l\)&lt;/span&gt;为极线方向；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;使用GN或者LM方法优化完成后，考虑最优化后的线搜点&lt;span class="math"&gt;\(p_j=[u,v]^T\)&lt;/span&gt;，由具体的投影公式推导可以得到逆深度点：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+p_r = KR_{ji}K^{-1}[p_i^T, 1]^T\\
+{d_{pi}}_u=\frac{p_r[2]\times u - p_r[0]}{Kt_{ji}[0]-Kt_{ji}[2]\times u}\\
+{d_{pi}}_v=\frac{p_r[2]\times v - p_r[1]}{Kt_{ji}[1]-Kt_{ji}[2]\times v}
+$$&lt;/div&gt;
+&lt;p&gt;除此之外，&lt;code&gt;DSO&lt;/code&gt;还需要考虑由于极线误差和像素梯度造成的像素误差&lt;code&gt;errorPixel&lt;/code&gt;造成逆深度不确定性的影响，得到逆深度点的&lt;code&gt;min&lt;/code&gt;和&lt;code&gt;max&lt;/code&gt;如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+{{d_{pi}}_u}_{min}=\frac{p_r[2]\times (u - l_x\times e_p) - p_r[0]}{Kt_{ji}[0]-Kt_{ji}[2]\times (u - l_x \times e_p)}\\
+{{d_{pi}}_v}_{min}=\frac{p_r[2]\times (v - l_y\times e_p) - p_r[1]}{Kt_{ji}[1]-Kt_{ji}[2]\times (v - l_y\times e_p)}\\
+{{d_{pi}}_u}_{max}=\frac{p_r[2]\times (u + l_x\times e_p) - p_r[0]}{Kt_{ji}[0]-Kt_{ji}[2]\times (u + l_x \times e_p)}\\
+{{d_{pi}}_v}_{max}=\frac{p_r[2]\times (v + l_y\times e_p) - p_r[1]}{Kt_{ji}[1]-Kt_{ji}[2]\times (v + l_y\times e_p)}
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(u\)&lt;/span&gt;为&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;的x坐标值；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(v\)&lt;/span&gt;为&lt;span class="math"&gt;\(p_j\)&lt;/span&gt;的y坐标值；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(e_p\)&lt;/span&gt;为由经验公式求得的像素误差；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(l_x\)&lt;/span&gt;为单位极线方向的x值；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(l_y\)&lt;/span&gt;为单位极线方向的y值；&lt;/li&gt;
+&lt;li&gt;最后，从两个&lt;code&gt;min&lt;/code&gt;值和两个&lt;code&gt;max&lt;/code&gt;值中选择一个最小值和一个最大值来更新未激活点的&lt;code&gt;idepth_min&lt;/code&gt;和&lt;code&gt;idepth_max&lt;/code&gt;即可。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id="3"&gt;3 未成熟点如何激活？&lt;/h2&gt;
+&lt;p&gt;未成熟点激活部分主要涵盖三方面的内容：构建距离地图，激活条件判断、激活点逆深度值优化。以最新关键帧&lt;code&gt;kf&lt;/code&gt;的金字塔第一层作为滑窗中现存激活点的投影位置。当某一个激活点投影到&lt;code&gt;kf&lt;/code&gt;的第一层后，更新相对像素距离到距离地图上。我想下面的图里描述的应该非常清楚（&lt;code&gt;#&lt;/code&gt;代表的是滑窗中的激活点投影位置），值得注意的是，针对某个投影点进行距离地图更新时，需要考虑其他投影点的位置，即某个像素位置&lt;code&gt;A&lt;/code&gt;距离投影点&lt;code&gt;p1&lt;/code&gt;的位置为5，而计算出距离另一个投影点为4时，就需要更新距离地图上的&lt;code&gt;A&lt;/code&gt;位置为4，而不是5。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/depth-map.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;激活条件的判断主要考虑了下面四种情况：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;未成熟点在最新的极线搜索中，它的线搜距离在8个像素以内，代表逆深度值达到一个收敛的范围；&lt;/li&gt;
+&lt;li&gt;未成熟点在最新的极线搜索中，要求搜索点的质量&lt;code&gt;quality&lt;/code&gt;大于3，质量被定义为次优线搜能量值 / 最优线搜能量值；&lt;/li&gt;
+&lt;li&gt;要求未成熟点的逆深度平均值（&lt;code&gt;idepth_min&lt;/code&gt; + &lt;code&gt;idepth_max&lt;/code&gt;）大于0；&lt;/li&gt;
+&lt;li&gt;要求未成熟点可以投影到最新关键帧上，并且要满足距离地图的约束（&lt;code&gt;DSO&lt;/code&gt;源码里面做了动态阈值调整，应该是根据工程实践调整出来的超参数）；&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;对于那些被判断为可以激活的点，&lt;code&gt;DSO&lt;/code&gt;将其分别投影到滑动窗口中的关键帧上，构建正规方程，并进行优化迭代求解，其残差构建和雅可比矩阵的求解我在&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中做了详细的推导，这里直接写结论：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+r_k = I_j[p_j] - a_{ji}I_i[p_i] - b_{ji}\\
+\begin{align*}
+    \frac{\partial{r_k}}{\partial{d_{pi}}}&amp;amp;=
+    \frac{1}{P_Z'} 
+    \begin{bmatrix} d_x&amp;amp;d_y \end{bmatrix} 
+    \begin{bmatrix} f_x &amp;amp; 0 \\ 0 &amp;amp; f_y \end{bmatrix}
+    \begin{bmatrix}
+        1 &amp;amp; 0 &amp;amp; -\frac{P_X'}{P_Z'} \\
+        0 &amp;amp; 1 &amp;amp; -\frac{P_Y'}{P_Z'} \\
+    \end{bmatrix}
+    \begin{bmatrix}
+        t_{ji}^X\\t_{ji}^Y\\t_{ji}^Z
+    \end{bmatrix}\\ &amp;amp;=
+    \frac{1}{P_Z'}[d_xf_x(t_X^{ji}-\frac{P_X'}{P_Z'}t^Z_{ji})+d_yf_y(t_Y^{ji}-\frac{P_Y'}{P_Z'}t^Z_{ji})]
+\end{align*}\\
+H_{dd}=\sum_{j\in \Omega}^{j!=i}{\sum_{p_i \in \mathcal{N(p)}}{\frac{\partial{r_k}}{\partial{d_{pi}}}^T\frac{\partial{r_k}}{\partial{d_{pi}}}}}\\
+b_d=\sum_{j\in \Omega}^{j\neq i}{\sum_{p_i \in \mathcal{N(p)}}{\frac{\partial{r_k}}{\partial{d_{pi}}}^Tr_k}}
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\Omega\)&lt;/span&gt;为滑动窗口中的关键帧索引集合；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(i\)&lt;/span&gt;为&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;点对应的host帧索引；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(j\)&lt;/span&gt;为&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;点投影的target帧索引；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\mathcal{N(p)}\)&lt;/span&gt;代表的是以&lt;span class="math"&gt;\(p\)&lt;/span&gt;为中心的&lt;code&gt;pattern&lt;/code&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;从残差对&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;点逆深度的雅可比矩阵来看，其优化过程应该相当迅速，因为正规方程中涉及到的内容全是标量。&lt;/p&gt;
+&lt;h2 id="4"&gt;4 如何根据关键帧和路标点构建优化的正规方程？&lt;/h2&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/swt-graph.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;这里我们假设地图点激活后，滑动窗口中有3个关键帧和5个地图点，上图表示了帧与帧之间的可视关系，以及帧与激活点之间的可视关系。其中红色线代表某个点的&lt;code&gt;host&lt;/code&gt;帧，黑色线代表着某个帧可以看到某个点。&lt;/p&gt;
+&lt;p&gt;根据&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中的残差模型推导，后端的优化能量函数，残差公式和残差的雅可比矩阵如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_{fpC}=\sum_{i\in \Omega, j \in \Omega}^{j \neq i} \sum_{p \in C(I_i)}\sum_{p_i \in \mathcal{N(p)}} {||r_k||_{\gamma}}\\
+r_k=I_j[p_j]-\frac{t_je^{a_i}}{t_ie^{a_j}}I_i[p_i]-(b_j-\frac{t_je^{a_i}}{t_ie^{a_j}}b_i)\\
+\frac{\partial{r_k}}{\partial{d_{pi}}}=
+\frac{1}{P_Z'}[d_xf_x(t_X^{ji}-\frac{P_X'}{P_Z'}t^Z_{ji})+d_yf_y(t_Y^{ji}-\frac{P_Y'}{P_Z'}t^Z_{ji})]\\
+\frac{\partial{r_k}}{\partial{\xi_{ji}}}=
+\begin{bmatrix} d_xf_x&amp;amp;d_yf_y\end{bmatrix}
+\begin{bmatrix}
+    \frac{d_{pi}}{P_{Z}'} &amp;amp; 0 &amp;amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{X}'}{P_{Z}'} &amp;amp; -\frac{P_{X}'P_{Y}'}{P_{Z}'^2} &amp;amp; 1+\frac{P_{X}^{2}}{P_{Z}^{2}} &amp;amp; -\frac{P_{Y}'}{P_{Z}'} 
+    \\
+    0 &amp;amp; \frac{d_{pi}}{P_{Z}'} &amp;amp; -\frac{d_{pi}}{P_{Z}'}\frac{P_{Y}'}{P_{Z}'} &amp;amp; -1-\frac{P_{Y}^{2}}{P_{Z}^{2}} &amp;amp; \frac{P_{X}'P_{Y}'}{P_{Z}^{2}} &amp;amp; \frac{P_{X}'}{P_{Z}'}
+\end{bmatrix}\\
+\frac{\partial r_k}{\partial a_{ji}}=-(I_i[p_i]-b_i)\\
+\frac{\partial r_k}{\partial b_{ji}}=-1
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_{fpC}\)&lt;/span&gt;为所有残差组成的能量部分，每个残差都由三个顶点组成，分别是&lt;span class="math"&gt;\(ij\)&lt;/span&gt;帧之间的相对参数、点&lt;span class="math"&gt;\(p\)&lt;/span&gt;的逆深度&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;和相机内参&lt;span class="math"&gt;\(C\)&lt;/span&gt;，因为&lt;code&gt;DSO&lt;/code&gt;的相机内参是由算法计算出来的，因此需要进行在线标定内参，我在&lt;a href="https://sunshanlu.github.io/dso_ssl/De-distortion-in-DSO"&gt;DSO中的去畸变操作&lt;/a&gt;中详细描述了&lt;code&gt;DSO&lt;/code&gt;相机内参的计算过程；&lt;/li&gt;
+&lt;li&gt;后端滑窗中使用的&lt;span class="math"&gt;\(a_{ji}=\frac{t_je^a_{i}}{t_ie^{a_j}}\)&lt;/span&gt;，与初始化过程的&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;不同，初始化过程中是为了保证&lt;span class="math"&gt;\(e^{a_{ji}}&amp;gt;0\)&lt;/span&gt;，而后端部分不需要这个保证，因为&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;的计算只是做一个雅可比&lt;strong&gt;中转&lt;/strong&gt;的作用，并且使用这种中转方式可以简化整个雅可比的推导过程（相比使用&lt;span class="math"&gt;\(e^{a_ji}\)&lt;/span&gt;作为中间量）；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial d_{pi}}\)&lt;/span&gt;和&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial \delta \xi_{ji}}\)&lt;/span&gt;部分直接使用的我在&lt;a href="https://sunshanlu.github.io/dso_ssl/Optimization-Model-DSO"&gt;DSO中的优化模型&lt;/a&gt;文章中推导的结论；&lt;/li&gt;
+&lt;li&gt;残差对仿射参数的求导相对简单，都是通过&lt;span class="math"&gt;\(a_{ji}=\frac{t_je^{a_{i}}}{t_ie^{a_{j}}}\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_{ji}=b_j - a_{ji} b_i\)&lt;/span&gt;作为中间变量进行推导即可，整个推导过程比较简单，这里就不展开说明了；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;由于&lt;code&gt;DSO&lt;/code&gt;使用算法的方式计算出了一个虚拟的相机内参，因此&lt;code&gt;DSO&lt;/code&gt;对相机内参做了在线标定，在滑窗优化过程中，将相机内参作为优化变量，求解残差对相机内参的雅可比矩阵，这个推导过程比较繁琐，涉及正向投影和反向投影两个部分，下面对残差相对内参的雅可比矩阵的详细推导：&lt;/p&gt;
+&lt;p&gt;反向投影过程，代表&lt;span class="math"&gt;\(p_i\)&lt;/span&gt;点向&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧的归一化坐标系上进行反向投影：
+&lt;/p&gt;
+&lt;div class="math"&gt;$$
+X_i^n=\frac{1}{f_x}u_i-\frac{c_x}{f_x}\\
+Y_i^n=\frac{1}{f_y}v_i-\frac{c_y}{f_y}\\
+\frac{\partial P_i^n}{\partial C}=\begin{bmatrix}
+    -\frac{u_i}{f_x^2} &amp;amp; 0 &amp;amp; -\frac{1}{f_x} &amp;amp; 0 \\
+    0 &amp;amp; -\frac{v_i}{f_y^2} &amp;amp; 0 &amp;amp; -\frac{1}{f_y} \\
+    0 &amp;amp; 0 &amp;amp; 0 &amp;amp; 0
+\end{bmatrix}
+$$&lt;/div&gt;
+&lt;p&gt;正向投影过程，代表由&lt;span class="math"&gt;\(i\)&lt;/span&gt;帧归一化坐标系&lt;span class="math"&gt;\(P_i^{n}\)&lt;/span&gt;向&lt;span class="math"&gt;\(j\)&lt;/span&gt;帧像素坐标系的投影过程，包含一个坐标变换和投影过程：
+&lt;/p&gt;
+&lt;div class="math"&gt;$$
+P_j' = R_{ji}P_i^{n}+t_{ji}d_{p_i}\\
+u_j = f_x \frac{X_j'}{Z_j'} + c_x\\
+v_j = f_y \frac{Y_j'}{Z_j'} + c_y\\
+\frac{\partial p_j}{\partial C} = \begin{bmatrix}
+    \frac{X_j'}{Z_j'} &amp;amp; 0 &amp;amp; 1 &amp;amp; 0 \\
+    0 &amp;amp; \frac{Y_j'}{Z_j'} &amp;amp; 0 &amp;amp; 1
+\end{bmatrix}\\
+\frac{\partial p_j}{\partial P_i^n}=\frac{\partial p_j}{\partial P_j'} \times \frac{\partial P_j'}{\partial P_i^n}=\begin{bmatrix}
+    \frac{f_x}{Z_j'} &amp;amp; 0 &amp;amp; -\frac{f_xX_j'}{Z_j'^2}\\
+    0 &amp;amp; \frac{f_y}{Z_j'} &amp;amp; -\frac{f_yY_j'}{Z_j'^2}
+\end{bmatrix}\times R_{ji}
+$$&lt;/div&gt;
+&lt;p&gt;结合正向和反向投影过程，可得残差对相机内参&lt;span class="math"&gt;\(C\)&lt;/span&gt;的雅可比矩阵：
+&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\begin{align*}
+    \frac{\partial r_k[p_j(C,P_i^n(C))]}{\partial C} &amp;amp;= \frac{\partial r_k}{\partial p_j}\times (\frac{\partial p_j}{\partial C} + \frac{\partial p_j}{\partial P_i^n}\times \frac{\partial P_i^n}{\partial C})\\
+    &amp;amp;=\begin{bmatrix}d_x &amp;amp; d_y\end{bmatrix}
+    (
+        \begin{bmatrix}
+            \frac{X_j'}{Z_j'} &amp;amp; 0 &amp;amp; 1 &amp;amp; 0 \\
+            0 &amp;amp; \frac{Y_j'}{Z_j'} &amp;amp; 0 &amp;amp; 1
+        \end{bmatrix}+
+        \begin{bmatrix}
+            \frac{f_x}{Z_j'} &amp;amp; 0 &amp;amp; -\frac{f_xX_j'}{Z_j'^2}\\
+            0 &amp;amp; \frac{f_y}{Z_j'} &amp;amp; -\frac{f_yY_j'}{Z_j'^2}
+        \end{bmatrix}\times R_{ji}\times
+        \begin{bmatrix}
+            -\frac{u_i}{f_x^2} &amp;amp; 0 &amp;amp; -\frac{1}{f_x} &amp;amp; 0 \\
+            0 &amp;amp; -\frac{v_i}{f_y^2} &amp;amp; 0 &amp;amp; -\frac{1}{f_y} \\
+            0 &amp;amp; 0 &amp;amp; 0 &amp;amp; 0
+        \end{bmatrix}
+    )
+\end{align*}
+$$&lt;/div&gt;
+&lt;p&gt;根据&lt;code&gt;DSO&lt;/code&gt;的残差模型，可以绘制图优化的优化图如下图所示，其中红色线连接三个顶点，分别为两帧之间的相对量顶点和激活点逆深度顶点和相机内参顶点。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/swt-graph-rel.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;根据上图所示的优化图，可以绘制由这些残差构建的Hessian矩阵如下图所示，但是这里会出现一些问题，如果去解这一个由两帧相对量和激活点构建的Hessian矩阵的话，得到的结果应该都是相对量增量，这样解出来的结果只是求解出了滑动窗口帧之间的&lt;strong&gt;相对量&lt;/strong&gt;&lt;code&gt;Tth&lt;/code&gt;、&lt;code&gt;a_th&lt;/code&gt;和&lt;code&gt;b_th&lt;/code&gt;，而不是相对于世界坐标系的&lt;strong&gt;绝对量&lt;/strong&gt;。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/H-rel.png" width="70%"/&gt;
+&lt;/div&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;讨论仅求帧相对量的可行性&lt;/p&gt;
+&lt;p&gt;我认为，仅求帧相对量不可行，我主要是通过一下三个方面来考虑的。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;相对量求解完成后，需要更新为绝对量，也就是相对于世界坐标系的参数量，在更新绝对量过程中会出现冲突问题，假设有三个关键帧，那么相对位姿就会有&lt;code&gt;T12&lt;/code&gt;、&lt;code&gt;T13&lt;/code&gt;和&lt;code&gt;T23&lt;/code&gt;三个，假设&lt;code&gt;Tw1&lt;/code&gt;已知的情况下,&lt;code&gt;Tw3&lt;/code&gt;可以通过两种方式表示，分别是&lt;code&gt;Tw1&lt;/code&gt; * &lt;code&gt;T13&lt;/code&gt;和&lt;code&gt;Tw1&lt;/code&gt; * &lt;code&gt;T12&lt;/code&gt; * &lt;code&gt;T23&lt;/code&gt;。这两种表示方法势必会产生冲突，这个冲突问题怎么解决呢？&lt;/li&gt;
+&lt;li&gt;就算可以通过某种方式，解决1中说明的更新冲突问题，那么当滑动窗口优化达到某个规模上限后，为了实时性势必会进行激活点和关键帧的边缘化操作，假设系统判定，当前需要边缘化&lt;span class="math"&gt;\(f_1\)&lt;/span&gt;这个关键帧，对于绝对量的表示来讲，其边缘化所表达的概率模型为 &lt;span class="math"&gt;\(p(f_1,f_2,f_3,p_1,p_2,p_3,p_4,p_5)=p(f_2,f_3,p_1,p_2,p_3,p_4,p_5|f_1) * p(f_1)\)&lt;/span&gt;，其中边缘化完成后&lt;span class="math"&gt;\(p(f_1)\)&lt;/span&gt;为常量概率。但是对相对量来讲，如何进行边缘化操作呢？不能把&lt;span class="math"&gt;\(f_1\)&lt;/span&gt;涉及的所有相对量都进行边缘化吧，这样的话肯定会造成信息丢失。&lt;/li&gt;
+&lt;li&gt;最后，即便不考虑相对量边缘化操作造成的信息丢失，在求解正规方程上，相对量的Hessian矩阵的规模也要比绝对量表示的Hessian矩阵大得多。因为&lt;span class="math"&gt;\(C_n^2 \geq n,n\geq 2\)&lt;/span&gt;总是成立的。因此使用&lt;code&gt;schur&lt;/code&gt;分解加速正规方程求解时，相对量表示的分解后得到的稠密矩阵H，要比绝对量表示的稠密矩阵H大得多。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;从上面三方面的分析来看，从&lt;strong&gt;可行性&lt;/strong&gt;，&lt;strong&gt;信息留存率&lt;/strong&gt;和&lt;strong&gt;效率&lt;/strong&gt;三方面来讲，绝对量表示的正规方程都优于相对量表示的正规方程。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h3 id="41"&gt;4.1 残差构建仅包含关键帧的相对量，怎么办？&lt;/h3&gt;
+&lt;p&gt;从上面的分析中可知，绝对量表示的正规方程要优于相对量表示的正规方程，&lt;code&gt;DSO&lt;/code&gt;使用位姿伴随的性质，求解&lt;span class="math"&gt;\(\frac{\delta\xi_{ji}}{\delta\xi_{i}}\)&lt;/span&gt;和&lt;span class="math"&gt;\(\frac{\delta \xi_{ji}}{\delta \xi_{j}}\)&lt;/span&gt;实现位姿相对量到绝对量的变换。而仿射参数的&lt;span class="math"&gt;\(\frac{\partial a_{ji}}{\partial a_i}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial a_{ji}}{\partial a_j}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial b_{ji}}{\partial b_i}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial b_{ji}}{\partial b_j}\)&lt;/span&gt;可以根据残差方程直接推导出来，下面是推导流程。&lt;/p&gt;
+&lt;p&gt;首先，需要说明一个位姿矩阵的伴随性质，&lt;span class="math"&gt;\(Exp(Ad_T \times \xi)=TExp(\xi)T^{-1}\)&lt;/span&gt;，其中&lt;span class="math"&gt;\(Ad_T\)&lt;/span&gt;为位姿矩阵&lt;span class="math"&gt;\(T\)&lt;/span&gt;的伴随矩阵，&lt;span class="math"&gt;\(\xi\)&lt;/span&gt;为一个李代数上的小扰动。现在，考虑一个相对量位姿&lt;span class="math"&gt;\(T_{ji}\)&lt;/span&gt;的左扰动&lt;span class="math"&gt;\(\delta \xi_{ji}\)&lt;/span&gt;，它势必会造成&lt;span class="math"&gt;\(T_{jw}\)&lt;/span&gt;和&lt;span class="math"&gt;\(T_{iw}\)&lt;/span&gt;的小的左扰动，假设它们分别是&lt;span class="math"&gt;\(\delta \xi_j\)&lt;/span&gt;和&lt;span class="math"&gt;\(\delta \xi_i\)&lt;/span&gt;，它们的公式描述如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\begin{align*}
+    Exp(\delta \xi_{ji})T_{ji}&amp;amp;=Exp(\delta \xi_j) T_{jw} T_{iw}^{-1} \\ &amp;amp;\to Exp(\delta \xi_{ji})=Exp(\delta \xi_j) \to \frac{ \partial \delta \xi_{ji}}{\partial \delta \xi_j}=I\\
+    Exp(\delta \xi_{ji})T_{ji}&amp;amp;=T_{jw} (Exp(\delta \xi_i)T_{iw})^{-1}=T_{jw}T_{iw}^{-1}Exp(-\delta \xi_i)\\
+    &amp;amp;\to Exp(\delta \xi_{ji})=T_{ji}Exp(-\delta \xi_i)T_{ji}^{-1}=-Ad_{T_{ji}} \times \delta \xi_i \to \frac{ \partial \delta \xi_{ji}}{\partial \delta \xi_i}=-Ad_{T_{ji}}
+\end{align*}
+$$&lt;/div&gt;
+&lt;p&gt;相对仿射参数到绝对仿射参数之间的转换比较简单，可以根据残差公式直接推导：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+r_k=I_j[p_j]-\frac{t_je^{a_i}}{t_ie^{a_j}}I_i[p_i]-(b_j-\frac{t_je^{a_i}}{t_ie^{a_j}}b_i)\\
+a_{ji}=\frac{t_je^{a_i}}{t_ie^{a_j}} \quad b_{ji}=(b_j-\frac{t_je^{a_i}}{t_ie^{a_j}}b_i)\\
+\frac{\partial a_{ji}}{\partial a_i}=\frac{t_je^{a_j}}{t_ie^{a_i}}\\
+\frac{\partial a_{ji}}{\partial a_j} = -\frac{t_je^{a_j}}{t_ie^{a_i}} \\
+\frac{\partial b_{ji}}{\partial b_i}=-\frac{t_je^{a_j}}{t_ie^{a_i}}\\
+\frac{\partial b_{ji}}{\partial b_j}= 1\\
+$$&lt;/div&gt;
+&lt;p&gt;上面通过推导的形式，构建了&lt;span class="math"&gt;\(\frac{\partial \delta \xi_{ji}}{\partial \xi_j}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial \delta \xi_{ji}}{\partial \xi_i}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial a_{ji}}{\partial a_i}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial a_{ji}}{\partial a_j}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial b_{ji}}{\partial b_i}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial b_{ji}}{\partial b_j}\)&lt;/span&gt;，因此可以计算残差相对于绝对量的雅可比矩阵，也就能完成基于相对量的&lt;code&gt;Hessian&lt;/code&gt;矩阵到绝对量&lt;code&gt;Hessian&lt;/code&gt;矩阵的转换。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/Hlocal-Hglobal.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;h3 id="42"&gt;4.2 为什么会有不一致性问题，该怎么解决？&lt;/h3&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的后端使用的是滑动窗口的优化策略，因此&lt;code&gt;DSO&lt;/code&gt;使用边缘化策略来控制整个后端滑动窗口中的规模。当然这个边缘化的操作是在后端优化完成后做的，其详细的策略我会在第5小节中描述，这里我们只需要知道，每次进行后端的滑动窗口优化时，都需要考虑最新边缘化操作得到的&lt;code&gt;HM&lt;/code&gt;和&lt;code&gt;bM&lt;/code&gt;矩阵。这代表着边缘化后剩余的信息，以最大似然估计的角度看，&lt;code&gt;HM&lt;/code&gt;和&lt;code&gt;bM&lt;/code&gt;中的信息代表着系统的条件概率，由于&lt;code&gt;HM&lt;/code&gt;和&lt;code&gt;bM&lt;/code&gt;会提供一个边缘化先验信息，它们所表达的约束为&lt;span class="math"&gt;\(H_M \delta x = -b_M\)&lt;/span&gt;，这个约束可以为后续的优化操作提供方向。&lt;/p&gt;
+&lt;p&gt;与想象中不同的是，我们&lt;strong&gt;不能&lt;/strong&gt;以下面这种方式使用边缘化得到的&lt;span class="math"&gt;\(H_M\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+(H_A + H_M + H_P) \delta x = -(b_A + b_M + b_P)
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(H_A\)&lt;/span&gt;，&lt;span class="math"&gt;\(b_A\)&lt;/span&gt;代表由滑动窗口中所有残差构建的H矩阵和b矩阵；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(H_M\)&lt;/span&gt;，&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;代表边缘化后得到的H矩阵和b矩阵；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(H_P\)&lt;/span&gt;，&lt;span class="math"&gt;\(b_P\)&lt;/span&gt;代表先验信息的H矩阵和b矩阵；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;不能直接进行相加的原因主要有两点，首先&lt;span class="math"&gt;\(H_A\)&lt;/span&gt;和&lt;span class="math"&gt;\(H_M\)&lt;/span&gt;线性化点的位置不同，这样直接相加会导致系统出现&lt;strong&gt;不一致性问题&lt;/strong&gt;，其次&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;在优化中代表的是能量在线性化点&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;处的能量梯度（能量对待优化量的雅可比矩阵，在线性化点&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;处），但是随着更新的进行，两个线性化点&lt;span class="math"&gt;\(x_A\)&lt;/span&gt;和&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;的距离可能逐渐变大，这样&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;就不能近似&lt;span class="math"&gt;\(x_A\)&lt;/span&gt;处的能量梯度了，其中&lt;span class="math"&gt;\(x_A\)&lt;/span&gt;代表的是残差的线性化点，&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;代表的是边缘化信息的线性化点，值得注意的是，&lt;span class="math"&gt;\(x_A\)&lt;/span&gt;随着优化的进行，会逐渐改变，而&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;则不能改变。&lt;/p&gt;
+&lt;p&gt;对不一致性问题的详细说明：在论文 &lt;strong&gt;[1]&lt;/strong&gt; 中，作者讨论了不同线性化点处的&lt;code&gt;H&lt;/code&gt;矩阵直接相加导致了&lt;span class="math"&gt;\(H\)&lt;/span&gt;矩阵的&lt;strong&gt;秩增加&lt;/strong&gt;的情况（系统的某些状态由不客观变得可观了），也就是说这种不正确的操作&lt;strong&gt;低估&lt;/strong&gt;了系统状态的&lt;strong&gt;不确定性&lt;/strong&gt;，认定这种改变系统状态不确定性的问题为系统&lt;strong&gt;不一致性&lt;/strong&gt;问题。下图清晰也表述了系统的不一致性问题，图中表示，系统的解为&lt;span class="math"&gt;\(xy=1\)&lt;/span&gt;，具有一个状态是不可观的。如果将&lt;span class="math"&gt;\(E_1\)&lt;/span&gt;在&lt;span class="math"&gt;\(x=0.5\)&lt;/span&gt;处线性化，&lt;span class="math"&gt;\(E_2\)&lt;/span&gt;在&lt;span class="math"&gt;\(x=1.2\)&lt;/span&gt;处线性化后求解，导致系统的解坍缩成了一个点，从而失去了系统的不确定性。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/inconsistencies.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;使用了&lt;code&gt;FEJ&lt;/code&gt;（First Estimate Jacobian）来解决不同线性化点导致的问题，&lt;code&gt;FEJ&lt;/code&gt;是这样描述的，由于边缘化提供的&lt;span class="math"&gt;\(H_M\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;线性化点不能改变了，但是由线性化残差构建的&lt;span class="math"&gt;\(H_A\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_A\)&lt;/span&gt;的线性化点却可以改变，为了保证&lt;code&gt;H&lt;/code&gt;矩阵的一致性，残差构建的&lt;span class="math"&gt;\(H_A\)&lt;/span&gt;也使用&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;进行线性化，不会改变系统的能观性，但是这样做势必会&lt;strong&gt;引入线性误差&lt;/strong&gt;。也就是说，残差&lt;span class="math"&gt;\(r_k\)&lt;/span&gt;值的计算，使用&lt;span class="math"&gt;\(x_A\)&lt;/span&gt;线性化点计算，&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial x}\)&lt;/span&gt;使用&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;线性化点处计算，这样可以构建一个新的&lt;span class="math"&gt;\(H_A\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_A\)&lt;/span&gt;。除此之外，为了避免&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;描述的能量梯度不准确的问题，&lt;code&gt;FEJ&lt;/code&gt;使用一阶泰勒展开对&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;进行&lt;strong&gt;修正&lt;/strong&gt;，&lt;code&gt;FEJ&lt;/code&gt;的公式描述如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_A(x) = E(x_A) + b_A(r_k(x_A), \frac{\partial r_k}{\partial x}|_{x=x_M})(x-x_A) + (x-x_A)^TH_A(x_M)(x-x_A) \\
+E_M(x) = E(x_M) + b_M(x_M + x_A - x_M)(x-x_A) + (x-x_A)^TH_M(x_M)(x-x_A)\\
+\frac{\partial b_M}{\partial x}|_{x=x_M}=H_M(x_M) \\
+b_M(x_M + x_A - x_M) = b_M(x_M) + H_M(x_M)(x_A - x_M) \\
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(x_A\)&lt;/span&gt;为某次优化中，残差线性化点；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;为&lt;code&gt;marg&lt;/code&gt;的线性化点；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_A(x)\)&lt;/span&gt;为残差对应能量值；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_M(x)\)&lt;/span&gt;为&lt;code&gt;marg&lt;/code&gt;对应的能量值；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;从&lt;code&gt;FEJ&lt;/code&gt;的公式描述可以发现，为了保证&lt;code&gt;H&lt;/code&gt;矩阵的一致性，&lt;span class="math"&gt;\(H_A(x_M)\)&lt;/span&gt;部分引入了线性化误差，在&lt;span class="math"&gt;\(b_A\)&lt;/span&gt;计算过程中，&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial x}|_{x=x_M}\)&lt;/span&gt;部分引入了线性化误差，而&lt;span class="math"&gt;\(b_M(x_M+x_A - x_M)\)&lt;/span&gt;部分使用泰勒展开进行了修正。&lt;/p&gt;
+&lt;div class="admonition warning"&gt;
+&lt;p class="admonition-title"&gt;&lt;span class="caps"&gt;FEJ&lt;/span&gt; 非用不可？&lt;/p&gt;
+&lt;p&gt;通过上面公式的分析，可以发现，使用&lt;code&gt;FEJ&lt;/code&gt;会不可避免的引入线性化误差（对残差部分来讲），而不引入&lt;code&gt;FEJ&lt;/code&gt;又会导致系统的不一致性问题。貌似使用&lt;code&gt;FEJ&lt;/code&gt;或者不使用&lt;code&gt;FEJ&lt;/code&gt;都做不到完美。我认为&lt;code&gt;FEJ&lt;/code&gt;并不是非使用不可，比如&lt;code&gt;VINS&lt;/code&gt;中就没有使用&lt;code&gt;FEJ&lt;/code&gt;，当然如果不使用&lt;code&gt;FEJ&lt;/code&gt;的话，还是建议使用&lt;code&gt;FEJ&lt;/code&gt;的&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;更新策略来维护&lt;span class="math"&gt;\(b_M\)&lt;/span&gt;。甚至可以&lt;strong&gt;部分使用&lt;/strong&gt;&lt;code&gt;FEJ&lt;/code&gt;，&lt;code&gt;DSO&lt;/code&gt;也是部分使用&lt;code&gt;FEJ&lt;/code&gt;，来规避引入大的&lt;strong&gt;线性误差&lt;/strong&gt;的风险。在&lt;code&gt;DSO&lt;/code&gt;中，激活点的逆深度状态完全没有使用&lt;code&gt;FEJ&lt;/code&gt;，这可能是因为激活点在经过一轮的滑动窗口优化后，可能不太稳定，如果固定逆深度的话，可能会引入较大的线性化误差。除此之外，&lt;code&gt;DSO&lt;/code&gt;对&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial \xi_{ji}}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial d_{pi}}\)&lt;/span&gt;和&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial C}\)&lt;/span&gt;分阶段求解，&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial \xi_{ji}}=\frac{\partial r_k}{\partial p_{j}}|_{x=x_A} \times \frac{\partial p_j}{\partial \xi_{ji}}|_{x=x_M} \quad \frac{\partial r_k}{\partial d_{pi}} = \frac{\partial r_k}{\partial p_j}|_{x=x_A} \times \frac{\partial p_j}{\partial d_{pi}}|_{x=x_M} \quad \frac{\partial r_k}{\partial C} = \frac{\partial r_k}{\partial p_j}|_{x=x_A} \times \frac{\partial p_j}{\partial C}|_{x=x_M}\)&lt;/span&gt;，可能考虑到图像为非线性比较强的函数，因此对所有残差雅可比涉及图像梯度的部分都没有使用&lt;code&gt;FEJ&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;在滑动窗口优化中的残差线性化阶段计算&lt;span class="math"&gt;\(\frac{\partial p_j}{\partial \delta \xi_{ji}}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial p_j}{\partial C}\)&lt;/span&gt;和&lt;span class="math"&gt;\(\frac{\partial p_j}{\partial d_{pi}}\)&lt;/span&gt;时使用了中心点的计算值代替整个&lt;code&gt;pattern&lt;/code&gt;中每一个点的计算值，相当于减少了部分计算量，不过不清楚这么做是否会加重&lt;code&gt;FEJ&lt;/code&gt;引入的线性化误差。&lt;/p&gt;
+&lt;/div&gt;
+&lt;p&gt;使用&lt;code&gt;FEJ&lt;/code&gt;解决了系统不一致性问题后，就需要考虑先验的影响。&lt;code&gt;DSO&lt;/code&gt;的系统求解中，主要有以下几种状态存在先验信息：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;初始化完成后，加入到滑动窗口中的两个关键帧状态有先验。&lt;/li&gt;
+&lt;li&gt;初始化完成后，加入到滑动窗口中的激活点逆深度状态有先验。&lt;/li&gt;
+&lt;li&gt;由算法计算出的虚拟内参，有先验。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在给定某个状态的先验信息矩阵&lt;span class="math"&gt;\(H_P\)&lt;/span&gt;后，先验信息构建的正规方程可以由下面的公式进行描述：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+E_P=\frac{1}{2}(x_A+\Delta x-x_P)^TH_P(x_P)(x_A+\Delta x-x_P)\\
+b_P(x_P)=H_P(x_P)(x_A+\Delta x-x_P)
+$$&lt;/div&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(E_P\)&lt;/span&gt;为先验信息所对应的能量值；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(H_P\)&lt;/span&gt;和&lt;span class="math"&gt;\(b_P\)&lt;/span&gt;为先验信息构建的正规方程矩阵；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(x_P\)&lt;/span&gt;为先验状态；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;综上所述，当残差构建完成后，系统会根据提供的先验信息矩阵和最新边缘化得到的边缘化信息构建本次滑动窗口优化的正规方程，并进行迭代求解，构建的正规方程可以由下面的公式进行描述：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+H = H_A(x_M) + H_P(x_P) + H_M(x_M)\\
+b = b_A(r_k(x_A), \frac{\partial r_k}{\partial x}|_{x=x_M}) + b_P(x_P) + b_M(x_M + x_A - x_M)\\
+H \Delta x = -b
+$$&lt;/div&gt;
+&lt;div class="admonition note"&gt;
+&lt;p class="admonition-title"&gt;FEJ减少的计算量&lt;/p&gt;
+&lt;p&gt;在上面对FEJ的探讨中，我们知道了&lt;code&gt;DSO&lt;/code&gt;中使用了部分&lt;code&gt;FEJ&lt;/code&gt;的方案来解决系统的不一致性问题，又避免了引入大的线性化误差。使用这种方案竟还意外的减少了部分计算量，在4.1节中我们知道&lt;code&gt;DSO&lt;/code&gt;需要将绝对量变换为相对量，需要求解&lt;span class="math"&gt;\(\frac{\partial {\xi_{ji}}}{\partial \xi_j}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial {\xi_{ji}}}{\partial \xi_i}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial {a_{ji}}}{\partial a_j}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial {a_{ji}}}{\partial a_i}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial {b_{ji}}}{\partial b_i}\)&lt;/span&gt;和&lt;span class="math"&gt;\(\frac{\partial {b_{ji}}}{\partial b_j}\)&lt;/span&gt;。而&lt;code&gt;DSO&lt;/code&gt;的部分&lt;code&gt;FEJ&lt;/code&gt;策略又将&lt;span class="math"&gt;\(\frac{\partial p_j}{\partial \xi_{ji}}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial \a_{ji}}\)&lt;/span&gt;、&lt;span class="math"&gt;\(\frac{\partial r_k}{\partial \b_{ji}}\)&lt;/span&gt;限制在线性化&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;处，因此相对量到绝对量转换的中间量的求解只需要在线性化点&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;处求解一次即可，在一定程度上可以减少一些计算量。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h3 id="43"&gt;4.3 在解正规方程时，如何防止解在零空间中漂移？&lt;/h3&gt;
+&lt;p&gt;对于某个等式&lt;span class="math"&gt;\(H \Delta x = -b\)&lt;/span&gt;来讲，如果矩阵&lt;span class="math"&gt;\(H\)&lt;/span&gt;不是满秩阵，那么必定存在&lt;span class="math"&gt;\(H x_{ns} = 0, x \ne \overrightarrow{0}\)&lt;/span&gt;。其中&lt;span class="math"&gt;\(x_{ns}\)&lt;/span&gt;为由&lt;span class="math"&gt;\(H\)&lt;/span&gt;矩阵在零空间上的基组成的向量。这个&lt;span class="math"&gt;\(x_{ns}\)&lt;/span&gt;也被称为解在零空间上的漂移。因为&lt;span class="math"&gt;\(H x_{ns} = 0, x \ne \overrightarrow{0}\)&lt;/span&gt;总是成立的，因此不论&lt;span class="math"&gt;\(x_{ns}\)&lt;/span&gt;漂移多少，&lt;span class="math"&gt;\(H (\Delta x + x_{ns}) = -b\)&lt;/span&gt;总是成立的。也就是说在解正规方程时，如果不对零空间的漂移加以限制，那么解与不含漂移的解之间的误差就会很大。然而对于单目的&lt;code&gt;VO&lt;/code&gt;系统来讲，系统总是有7个自由度，也就是说，H矩阵一定非满秩，并且与其行数差7，需要进行一些处理手段来保证正规方程得到的解不漂移。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;的源码里面定义了两种防止零空间漂移的方法，一种是基于&lt;code&gt;SVD&lt;/code&gt;分解截断小奇异值求矩阵伪逆的方案，另一种是基于位姿矩阵伴随的性质求解世界坐标系零空间到局部坐标系零空间映射，并使用正交基投影的方式去掉零空间漂移的影响。&lt;/p&gt;
+&lt;p&gt;首先，我们先看下&lt;code&gt;DSO&lt;/code&gt;求伪逆是如何防止零空间漂移的，假设目前完成了某次线性化，得到正规方程&lt;span class="math"&gt;\(H \Delta x = -b\)&lt;/span&gt;，那么&lt;span class="math"&gt;\(H\)&lt;/span&gt;的伪逆可以由下面的公式表示：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+H = U \Sigma V^T\\
+H^{-1} = V \Sigma^{+}U^T\\
+\Delta x^+ = H^{-1}b
+$$&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(U\)&lt;/span&gt;和&lt;span class="math"&gt;\(V\)&lt;/span&gt;为酉矩阵（代表等距变换，列正交）；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\Sigma\)&lt;/span&gt;矩阵为对角矩阵，其对角上的值为奇异值；&lt;/li&gt;
+&lt;li&gt;奇异值为0的对应的 &lt;strong&gt;&lt;span class="math"&gt;\(V\)&lt;/span&gt;矩阵&lt;/strong&gt;的&lt;strong&gt;列&lt;/strong&gt;为矩阵&lt;span class="math"&gt;\(H\)&lt;/span&gt;的&lt;strong&gt;零空间的基&lt;/strong&gt;，并且是&lt;strong&gt;正交基&lt;/strong&gt;；&lt;/li&gt;
+&lt;li&gt;对&lt;span class="math"&gt;\(\Sigma\)&lt;/span&gt;矩阵中的小奇异值置零后，将其非0奇异值取倒数后，转置得到&lt;span class="math"&gt;\(\Sigma^{+}\)&lt;/span&gt;；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(H^{-1}\)&lt;/span&gt;为&lt;span class="math"&gt;\(H\)&lt;/span&gt;的伪逆；&lt;/li&gt;
+&lt;li&gt;&lt;span class="math"&gt;\(\Delta x^+\)&lt;/span&gt;为去掉零空间漂移的正规方程的解；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;通过对&lt;span class="math"&gt;\(\Sigma^+\)&lt;/span&gt;矩阵和&lt;span class="math"&gt;\(V\)&lt;/span&gt;矩阵的描述可知，&lt;span class="math"&gt;\(V\)&lt;/span&gt;矩阵中0奇异值对应的列向量为零空间的一组正交基，然而&lt;span class="math"&gt;\(\Sigma^+\)&lt;/span&gt;矩阵将小奇异值置零，在伪逆计算中，&lt;span class="math"&gt;\(\Sigma ^+\)&lt;/span&gt;作用到了矩阵&lt;span class="math"&gt;\(V\)&lt;/span&gt;的右侧，因此&lt;span class="math"&gt;\(V\)&lt;/span&gt;矩阵0奇异值对应的列向量被&lt;span class="math"&gt;\(\Sigma ^+\)&lt;/span&gt;矩阵作用后置零，因此得到的结果消除了零空间的影响。在&lt;code&gt;DSO&lt;/code&gt;的源码里面有两种截断方式，一种是强制的&lt;strong&gt;7自由度截断&lt;/strong&gt;，还有一种是定&lt;strong&gt;阈值截断法&lt;/strong&gt;（小于这个阈值的奇异值置零）。&lt;/p&gt;
+&lt;p&gt;还有一种方式是通过世界坐标系零空间到相机坐标系零空间基转换的方式，直接求解出来相机坐标系对应的零空间的基，然后通过正交投影的方式得到零空间分量，最后减去即可。我们知道&lt;code&gt;VO&lt;/code&gt;系统有7个自由度，即如果在世界坐标系上添加扰动，那么&lt;code&gt;VO&lt;/code&gt;系统的约束仍然成立，因此世界坐标系上的零空间的基是恒定的，而相机坐标系上的零空间的基需要世界坐标系进行转换，下面的公式描述了这种转换关系：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+Exp(\delta \xi_c) T_{cw} = (Exp(\delta \xi_w) T_{wc})^{-1} \to 
+Exp(\delta \xi_c) = T_{cw} Exp(-\delta \xi_w) T_{cw}^{-1} \to
+\delta \xi_c = -Ad_{T_{cw}} \times \delta \xi_w \\
+$$&lt;/div&gt;
+&lt;p&gt;在&lt;code&gt;DSO&lt;/code&gt;中使用世界坐标系零空间基上的正负两个扰动来推导出&lt;code&gt;DSO&lt;/code&gt;相机坐标系对应的零空间基上的扰动，这里以&lt;span class="math"&gt;\(x\)&lt;/span&gt;轴旋转&lt;span class="math"&gt;\(\phi_x\)&lt;/span&gt;和比例因子&lt;span class="math"&gt;\(s\)&lt;/span&gt;为例进行推导：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+\delta {\xi_{w}^{\phi_x}}_p = \begin{bmatrix}
+    10^{-3} &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 &amp;amp; 0
+\end{bmatrix}\\
+\delta {\xi_{w}^{\phi_x}}_n = \begin{bmatrix}
+    10^{-3} &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 &amp;amp; 0 &amp;amp; 0
+\end{bmatrix}\\
+\delta \xi_c^{\phi_x} = -\frac{1}{2\times 10^{-3}}Ad_{T_{cw}} \times (\delta {\xi_{w}^{\phi_x}}_p - \delta {\xi_{w}^{\phi_x}}_n)\\
+\delta {s_w}_p = 1.0001\\
+\delta {s_w}_p = \frac{1}{1.0001}\\
+\delta \xi_c^s = \frac{1}{2\times 10^{-4}}Log(\begin{bmatrix}
+    R_{cw} &amp;amp; \delta {s_w}_p t_{cw}\\
+    0 &amp;amp; 1
+\end{bmatrix} T_{cw}^{-1}) - Log(\begin{bmatrix}
+    R_{cw} &amp;amp; \delta {s_w}_n t_{cw}\\
+    0 &amp;amp; 1
+\end{bmatrix} T_{cw}^{-1})
+$$&lt;/div&gt;
+&lt;p&gt;在得到世界坐标系下的零空间基到相机坐标系下的零空间基转换后，通过正交投影的方式可以求得解在零空间中的分量，然后减去这个分量即可，下图是正交投影的例子，在 &lt;strong&gt;[2]&lt;/strong&gt; 中推导得出&lt;span class="math"&gt;\(P_{\mathcal{M}}=M(M^TM)^{-1}M^T\)&lt;/span&gt;，其中&lt;span class="math"&gt;\(M\)&lt;/span&gt;为零空间中的基组成的矩阵，&lt;span class="math"&gt;\(P_{\mathcal{M}}v\)&lt;/span&gt;代表的是&lt;span class="math"&gt;\(v\)&lt;/span&gt;在零空间中的分量。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/orth-proj.png" width="60%"/&gt;
+&lt;/div&gt;
+&lt;h3 id="44-h"&gt;4.4 如何保证H矩阵非病态？&lt;/h3&gt;
+&lt;p&gt;文章 &lt;strong&gt;[3]&lt;/strong&gt; 中描述了&lt;strong&gt;病态矩阵&lt;/strong&gt;出现的原因，针对正规方程&lt;span class="math"&gt;\(H\delta x=-b\)&lt;/span&gt;这个公式，病态的&lt;span class="math"&gt;\(H\)&lt;/span&gt;矩阵由于列相关性较高导致条件数过大，从而使得解&lt;span class="math"&gt;\(\delta x\)&lt;/span&gt;收&lt;span class="math"&gt;\(b\)&lt;/span&gt;矩阵的扰动较大。出现病态矩阵的根本原因是&lt;span class="math"&gt;\(H\)&lt;/span&gt;矩阵中存在相关性较高的列，&lt;code&gt;SVD&lt;/code&gt;分解后表现在&lt;span class="math"&gt;\(\Sigma\)&lt;/span&gt;矩阵中存在极小的特征值，这与正规方程的解在零空间漂移存在一些关系，解在零空间漂移出现的原因是系统存在一定的自由度，即可以明确存在一些完全相关的列，而病态矩阵的出现是因为系统存在一些&lt;strong&gt;高度&lt;/strong&gt;相关的列（不完全相关），从而在求解&lt;span class="math"&gt;\(\delta_x -H^{-1}b\)&lt;/span&gt;时，小奇异值作用到&lt;span class="math"&gt;\(H^{-1}\)&lt;/span&gt;上后，会产生&lt;strong&gt;较大的scale作用&lt;/strong&gt;，从而难以应对&lt;span class="math"&gt;\(b\)&lt;/span&gt;矩阵扰动情况。&lt;/p&gt;
+&lt;p&gt;普通病态矩阵可以通过截断&lt;code&gt;SVD&lt;/code&gt;的方案来解决，即使用&lt;code&gt;SVD&lt;/code&gt;对矩阵&lt;span class="math"&gt;\(H\)&lt;/span&gt;进行分解，然后求&lt;span class="math"&gt;\(H\)&lt;/span&gt;矩阵的逆时，可以将&lt;span class="math"&gt;\(\Sigma\)&lt;/span&gt;矩阵中的小奇异值置零，将奇异值部分完全看做矩阵的零空间零空间来处理。&lt;code&gt;DSO&lt;/code&gt;中的某个&lt;code&gt;solver&lt;/code&gt;也使用了截断&lt;code&gt;SVD&lt;/code&gt;的方式处理零空间问题，即给定某个阈值，小于这个阈值的奇异值都置零，这样可以&lt;strong&gt;同时解决&lt;/strong&gt;零空间问题和病态矩阵问题。&lt;/p&gt;
+&lt;p&gt;&lt;code&gt;DSO&lt;/code&gt;另外使用了一种对角线预处理的方式，来解决病态矩阵问题，对&lt;span class="math"&gt;\(H\)&lt;/span&gt;和&lt;span class="math"&gt;\(b\)&lt;/span&gt;矩阵进行预处理，旨在降低&lt;span class="math"&gt;\(H\)&lt;/span&gt;矩阵的条件数。对角预处理的公式描述如下：&lt;/p&gt;
+&lt;div class="math"&gt;$$
+W = \sqrt{diag(H) + 10 \times I}\\
+H'=WHW\\
+b'=Wb\\
+x = -WH'^{-1}b'\\
+$$&lt;/div&gt;
+&lt;p&gt;其中，&lt;span class="math"&gt;\(diag(H)\)&lt;/span&gt;代表取H的对角线组成新的对角矩阵，使用这种对角预处理的手段确实可以减少矩阵H的条件数，但是比较有限。&lt;/p&gt;
+&lt;h2 id="5"&gt;5. 滑动窗口中的帧和点超出限定范围怎么办？&lt;/h2&gt;
+&lt;p&gt;当滑动窗口的优化完成后，就到了边缘化判断和实施边缘化操作的阶段，我们知道&lt;code&gt;DSO&lt;/code&gt;后端使用的是滑动窗口优化策略，因此为了保证优化的实时性，需要控制后端滑动窗口的规模，在&lt;code&gt;DSO&lt;/code&gt;的源码中规定了理想的后端优化的规模，即&lt;code&gt;5~7&lt;/code&gt;个关键帧和&lt;code&gt;2000&lt;/code&gt;个左右的激活点。也就是说，当后端窗口中的关键帧或者激活点超出这个范围时，&lt;code&gt;DSO&lt;/code&gt;就会使用边缘化的策略来控制滑动窗口的规模，以下是&lt;code&gt;DSO&lt;/code&gt;的点管理和帧管理策略：&lt;/p&gt;
+&lt;p&gt;帧管理策略：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;从优化提供的作用角度考虑，当某一帧&lt;span class="math"&gt;\(\frac{n_{i} + n_{p}}{n_{m} + n_{d} + n_i + n_p} &amp;lt; 0.05\)&lt;/span&gt;则判断当前帧需要被边缘化，其中&lt;span class="math"&gt;\(n_{i}\)&lt;/span&gt;代表未成熟点的个数，&lt;span class="math"&gt;\(n_{p}\)&lt;/span&gt;代表该帧中激活点的数目，&lt;span class="math"&gt;\(n_m\)&lt;/span&gt;代表该帧被边缘化点的数目，&lt;span class="math"&gt;\(n_d\)&lt;/span&gt;代表该帧被丢掉点的数目，如果可以对优化起作用的点数目（&lt;span class="math"&gt;\(n_i + n_p\)&lt;/span&gt;）占所有点的比例小于5%时，则判断该帧对优化提供的作用较少，标记为边缘化；&lt;/li&gt;
+&lt;li&gt;从曝光参数上考虑，计算某一帧和最新帧之间的光度参数&lt;span class="math"&gt;\(a_{ji}&amp;gt;=0.7\)&lt;/span&gt;（这里的&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;和初始化中的&lt;span class="math"&gt;\(a_{ji}\)&lt;/span&gt;意义相同），则认为该帧和最新帧之间的亮度变化太大（环境光变化大），则标记当前帧为边缘化；&lt;/li&gt;
+&lt;li&gt;在时间轴上考虑，保证距离最新帧&lt;code&gt;newFH&lt;/code&gt;较近的3帧不被边缘化；&lt;/li&gt;
+&lt;li&gt;在距离轴上考虑，提出启发式距离评价方法，距离评分公式为&lt;span class="math"&gt;\(s(I_i)=-\sqrt{d(i, 1)}\times \sum_{j\in[3,n],j\ne i}{d(i,j)^{-1}}\)&lt;/span&gt;，将评分最小的帧标记为边缘化帧；&lt;/li&gt;
+&lt;li&gt;值得注意的是，每次只边缘化一帧，上面的条件从上到下依次判断，如果满足某一个条件则标记边缘化帧后退出。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;点管理策略：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;逆深度小于0或者没有参与优化的点，被丢掉drop&lt;/li&gt;
+&lt;li&gt;判断某个点对后续滑动优化的作用：&lt;ul&gt;
+&lt;li&gt;某一帧被边缘化后，点残差保留太少，则认定对后续滑窗优化作用不大&lt;/li&gt;
+&lt;li&gt;最新帧看不到该点，则认定为对后续滑窗优化作用不大&lt;/li&gt;
+&lt;li&gt;针对那些残差比较少的点，是新加入的点，认定对后续滑窗优化的作用较大（源码里面还做了单独的判断，这个判断是否不需要做，仅对作用不大的条件进行判断不就好了？）&lt;/li&gt;
+&lt;li&gt;在最近两次滑窗优化中都被判断为是outlier的点，则认定对后续滑窗优化作用不大&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;判断某个点是否是内点：&lt;ul&gt;
+&lt;li&gt;要求残差数量要大于某个阈值&lt;/li&gt;
+&lt;li&gt;要求被判断为是&lt;code&gt;inlier&lt;/code&gt;的残差数量要大于某个阈值&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;如果判断某个点对后续滑窗优化的作用不大 或者 某个激活点的&lt;code&gt;host&lt;/code&gt;帧为待被边缘化的帧&lt;ul&gt;
+&lt;li&gt;如果这个点被判断为内点&lt;ul&gt;
+&lt;li&gt;判断该点的&lt;span class="math"&gt;\(H_{dd} &amp;gt; 50\)&lt;/span&gt;，&lt;span class="math"&gt;\(H_{dd}\)&lt;/span&gt;是该点在滑窗优化中计算的&lt;code&gt;Hessian&lt;/code&gt;，如果不满足则标记为丢掉；&lt;/li&gt;
+&lt;li&gt;否则标记为边缘化掉；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;如果这个点被判断为外点，则标记为丢掉。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;假设下图中，点&lt;span class="math"&gt;\(p_1\)&lt;/span&gt;需要被丢掉，点&lt;span class="math"&gt;\(p_2\)&lt;/span&gt;、&lt;span class="math"&gt;\(p_3\)&lt;/span&gt;、帧&lt;span class="math"&gt;\(kf_1\)&lt;/span&gt;需要被边缘化掉。&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/swt-graph.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;p&gt;具体执行边缘化的流程可以由下图进行描述，首先根据要被边缘化的残差构建&lt;code&gt;Hessian&lt;/code&gt;和&lt;code&gt;b&lt;/code&gt;，值得注意的是，线性化点为&lt;span class="math"&gt;\(x_M\)&lt;/span&gt;，在实施边缘化操作之前，还需要考虑点的先验信息，需要加上确定被边缘化的状态的先验&lt;code&gt;Hessian&lt;/code&gt;和先验&lt;code&gt;b&lt;/code&gt;，然后先边缘化点，最后边缘化帧。使用&lt;code&gt;schur&lt;/code&gt;分解的方式实现，下面的图描述了这一过程：&lt;/p&gt;
+&lt;div align="center"&gt;
+&lt;img src="https://sunshanlu.github.io/dso_ssl/images/marg.png" width="80%"/&gt;
+&lt;/div&gt;
+&lt;div class="admonition important"&gt;
+&lt;p class="admonition-title"&gt;为什么先边缘化点再边缘化帧？&lt;/p&gt;
+&lt;p&gt;在点管理策略中可以发现，某个帧如果被判断为要被边缘化掉的话，该帧上的所有激活点都要被丢掉或者边缘化掉。并且实施边缘化时需要先边缘化掉点，然后边缘化掉帧。这么做的原因在于，防止边缘化帧时导致点与点之间的Hessian变稠密。如果点与点之间的Hessian不在稀疏，那么整个优化过程将变的极其复杂，&lt;code&gt;schur&lt;/code&gt;分解加速优化将不再成立，求解正规方程将非常缓慢。&lt;/p&gt;
+&lt;/div&gt;
+&lt;h2 id="reference"&gt;Reference&lt;/h2&gt;
+&lt;p&gt;[1] T. -C. Dong-Si and &lt;span class="caps"&gt;A. I.&lt;/span&gt; Mourikis, “Consistency analysis for sliding-window visual odometry,” 2012 &lt;span class="caps"&gt;IEEE&lt;/span&gt; International Conference on Robotics and Automation, Saint Paul, &lt;span class="caps"&gt;MN&lt;/span&gt;, &lt;span class="caps"&gt;USA&lt;/span&gt;, 2012, pp. 5202-5209, doi: 10.1109/&lt;span class="caps"&gt;ICRA&lt;/span&gt;.2012.6225246.&lt;/p&gt;
+&lt;p&gt;[2] Meyer C D. Matrix analysis and applied linear algebra[M]. Society for Industrial and Applied Mathematics, 2023.&lt;/p&gt;
+&lt;p&gt;[3] &lt;a href="https://www.cnblogs.com/daniel-D/p/3219802.html"&gt;机器学习中的矩阵方法(附录A)： 病态矩阵与条件数&lt;/a&gt;&lt;/p&gt;
+&lt;script type="text/javascript"&gt;if (!document.getElementById('mathjaxscript_pelican_#%@#$@#')) {
+    var align = "center",
+        indent = "0em",
+        linebreak = "false";
+
+    if (false) {
+        align = (screen.width &lt; 768) ? "left" : align;
+        indent = (screen.width &lt; 768) ? "0em" : indent;
+        linebreak = (screen.width &lt; 768) ? 'true' : linebreak;
+    }
+
+    var mathjaxscript = document.createElement('script');
+    mathjaxscript.id = 'mathjaxscript_pelican_#%@#$@#';
+    mathjaxscript.type = 'text/javascript';
+    mathjaxscript.src = 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.3/latest.js?config=TeX-AMS-MML_HTMLorMML';
+
+    var configscript = document.createElement('script');
+    configscript.type = 'text/x-mathjax-config';
+    configscript[(window.opera ? "innerHTML" : "text")] =
+        "MathJax.Hub.Config({" +
+        "    config: ['MMLorHTML.js']," +
+        "    TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'none' } }," +
+        "    jax: ['input/TeX','input/MathML','output/HTML-CSS']," +
+        "    extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']," +
+        "    displayAlign: '"+ align +"'," +
+        "    displayIndent: '"+ indent +"'," +
+        "    showMathMenu: true," +
+        "    messageStyle: 'normal'," +
+        "    tex2jax: { " +
+        "        inlineMath: [ ['\\\\(','\\\\)'] ], " +
+        "        displayMath: [ ['$$','$$'] ]," +
+        "        processEscapes: true," +
+        "        preview: 'TeX'," +
+        "    }, " +
+        "    'HTML-CSS': { " +
+        "        availableFonts: ['STIX', 'TeX']," +
+        "        preferredFont: 'STIX'," +
+        "        styles: { '.MathJax_Display, .MathJax .mo, .MathJax .mi, .MathJax .mn': {color: '#145402 ! important'} }," +
+        "        linebreaks: { automatic: "+ linebreak +", width: '90% container' }," +
+        "    }, " +
+        "}); " +
+        "if ('default' !== 'default') {" +
+            "MathJax.Hub.Register.StartupHook('HTML-CSS Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax['HTML-CSS'].FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+            "MathJax.Hub.Register.StartupHook('SVG Jax Ready',function () {" +
+                "var VARIANT = MathJax.OutputJax.SVG.FONTDATA.VARIANT;" +
+                "VARIANT['normal'].fonts.unshift('MathJax_default');" +
+                "VARIANT['bold'].fonts.unshift('MathJax_default-bold');" +
+                "VARIANT['italic'].fonts.unshift('MathJax_default-italic');" +
+                "VARIANT['-tex-mathit'].fonts.unshift('MathJax_default-italic');" +
+            "});" +
+        "}";
+
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(configscript);
+    (document.body || document.getElementsByTagName('head')[0]).appendChild(mathjaxscript);
+}
+&lt;/script&gt;</content><category term="DSO"></category><category term="vSLAM"></category><category term="DSO"></category><category term="Robot"></category></entry><entry><title>DSO的前端跟踪</title><link href="https://sunshanlu.github.io/dso_ssl/Track-frame-in-DSO" rel="alternate"></link><published>2025-02-18T00:00:00+08:00</published><updated>2025-02-18T00:00:00+08:00</updated><author><name>孙善路-github</name></author><id>tag:sunshanlu.github.io,2025-02-18:/dso_ssl/Track-frame-in-DSO</id><summary type="html">
 &lt;p&gt;DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍 …&lt;/p&gt;</summary><content type="html">
 &lt;p&gt;DSO中的前端跟踪过程相对简单，其主要涵盖跟踪前处理、跟踪过程和跟踪后处理三部分内容。下面我会对这三部分进行拆解并对其中的细节进行介绍。&lt;/p&gt;
 &lt;h2 id="1"&gt;1. 参考帧确定和跟踪参考点构建（跟踪前处理）&lt;/h2&gt;
@@ -630,7 +1124,7 @@ $$&lt;/div&gt;
 &lt;p&gt;综上，通过链式法则将5部分的雅可比矩阵相乘可得残差对&lt;span class="math"&gt;\(d_{pi}\)&lt;/span&gt;的雅可比矩阵为:&lt;/p&gt;
 &lt;div class="math"&gt;$$
 \begin{align*}
-    \frac{\partial{r_k}}{\partial{\xi_{ji}}}&amp;amp;=
+    \frac{\partial{r_k}}{\partial{d_{pi}}}&amp;amp;=
     \frac{1}{P_Z'} 
     \begin{bmatrix} d_x&amp;amp;d_y \end{bmatrix} 
     \begin{bmatrix} f_x &amp;amp; 0 \\ 0 &amp;amp; f_y \end{bmatrix}
