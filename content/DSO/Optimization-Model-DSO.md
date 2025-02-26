@@ -124,7 +124,7 @@ $$
 
 $$
 \begin{align*}
-    \frac{\partial{r_k}}{\partial{\xi_{ji}}}&=
+    \frac{\partial{r_k}}{\partial{d_{pi}}}&=
     \frac{1}{P_Z'} 
     \begin{bmatrix} d_x&d_y \end{bmatrix} 
     \begin{bmatrix} f_x & 0 \\ 0 & f_y \end{bmatrix}
