@@ -1,0 +1,29 @@
+# FOV像素去畸变超参数定义文件
+
+# 相机畸变参数信息
+DistortedMessage:
+    # 0: pinhole, 1: pinhole + RadTan3, 2: pinhole + RadTan5, 3: pinhole + FOV, 4: pinhole + EQUI
+    DistortedMode: 3
+    # 根据不同的模型读取前几个参数
+    DistortedParams: [0.897966326944875]
+
+# 相机内参
+CameraIntrinsics:
+    Fx: 685.720714351
+    Fy: 685.636463463
+    Cx: 631.358137965
+    Cy: 512.418472293
+
+# 图像尺寸
+ImageSize:
+    # 原始图像尺寸
+    SourceImgSz:
+        Width: 1280
+        Height: 720
+
+    # 虚拟图像尺寸
+    TargetImgSz:
+        Width: 640
+        Height: 480
+
+MaxIterations: 15 # 计算虚拟相机内参的最大迭代次数

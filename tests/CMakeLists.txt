@@ -1,0 +1,3 @@
+add_executable(TestUndistorted TestUndistorted.cc)
+target_link_libraries(TestUndistorted dso-ssl)
+target_include_directories(TestUndistorted PRIVATE ${PROJECT_SOURCE_DIR}/include)
