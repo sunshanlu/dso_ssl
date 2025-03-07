@@ -122,9 +122,14 @@ void PixelUndistorter::BuildRemap()
                       Eigen::Vector2f undistorted_point(xn, yn);
                       auto distorted_point = config_->Distort(undistorted_point);
 
-                      remap_x[idx] = distorted_point[0];
-                      remap_y[idx] = distorted_point[1];
+                      remap_x[idx] = config_->source_K_.fx * distorted_point[0] + config_->source_K_.cx;
+                      remap_y[idx] = config_->source_K_.fy * distorted_point[1] + config_->source_K_.cy;
                   });
+
+    // std::cout << "x_max: " << *std::max_element(remap_x.begin(), remap_x.end()) << std::endl;
+    // std::cout << "x_min: " << *std::min_element(remap_x.begin(), remap_x.end()) << std::endl;
+    // std::cout << "y_max: " << *std::max_element(remap_y.begin(), remap_y.end()) << std::endl;
+    // std::cout << "y_min: " << *std::min_element(remap_y.begin(), remap_y.end()) << std::endl;
 
     cv::Mat(config_->target_size_[1], config_->target_size_[0], CV_32F, remap_x.data()).copyTo(remap_x_);
     cv::Mat(config_->target_size_[1], config_->target_size_[0], CV_32F, remap_y.data()).copyTo(remap_y_);
@@ -242,12 +247,15 @@ bool PixelUndistorter::MatchAxisProject(float &axis_value, Axis axis_direction, 
  */
 void PixelUndistorter::ComputeLimitAxis(float &lx_max, float &ly_max, float &lx_min, float &ly_min)
 {
-    lx_max = lx_min = ly_max = ly_min = 0;
+    std::vector<float> limits_axis_pos(4, 0);
+    std::vector<int> indices(4, 0);
+    std::iota(indices.begin(), indices.end(), 0);
 
-    auto grids = CreateMeshgrid();
-    std::for_each(std::execution::par_unseq, grids.begin(), grids.end(),
-                  [&](auto &grid)
+    std::vector<Grid> grids = CreateMeshgrid();
+    std::for_each(std::execution::par_unseq, indices.begin(), indices.end(),
+                  [&](const int &idx)
                   {
+                      const auto &grid = grids[idx];
                       for (const auto &undistorted_point : grid)
                       {
                           auto distorted_point = config_->Distort(undistorted_point);
@@ -256,51 +264,38 @@ void PixelUndistorter::ComputeLimitAxis(float &lx_max, float &ly_max, float &lx_
 
                           if (u < config_->source_size_[0] - 3 && u >= 3 && v < config_->source_size_[1] - 3 && v >= 3)
                           {
-                              if (undistorted_point[0] < 0)
-                                  lx_min = undistorted_point[0];
-                              if (undistorted_point[0] > 0)
-                                  lx_max = undistorted_point[0];
-
-                              if (undistorted_point[1] < 0)
-                                  ly_min = undistorted_point[1];
-                              if (undistorted_point[1] > 0)
-                                  ly_max = undistorted_point[1];
+                              if (idx < 2)
+                                  limits_axis_pos[idx] = undistorted_point[0];
+                              else
+                                  limits_axis_pos[idx] = undistorted_point[1];
+                              break;
                           }
                       }
                   });
+    lx_min = limits_axis_pos[0];
+    lx_max = limits_axis_pos[1];
+    ly_min = limits_axis_pos[2];
+    ly_max = limits_axis_pos[3];
 }
 
-/// 在无畸变归一化坐标系上，找到2 * 10001个点
+/// 在无畸变归一化坐标系上，找到2 * 10000个点
 std::vector<PixelUndistorter::Grid> PixelUndistorter::CreateMeshgrid()
 {
-    Grid grid;
-    grid.reserve(50000);
-    std::vector<Grid> grids;
-    grids.resize(4);
+    const float gap = 10.f / 100000;
+    Grid grid(50000, Eigen::Vector2f(0, 0));
+    std::vector<Grid> grids(4, Grid(50000, Eigen::Vector2f(0, 0)));
 
-    float gap = 10.f / 100000;
-
-    /// x轴 负数->0，投影不到->投影到
-    for (float x = -5.f; x < 0; x += gap)
-        grid.push_back(Eigen::Vector2f(x, 0));
-    grids.push_back(grid);
-    grid.clear();
-
-    /// x轴 正数->0，投影不到->投影到
-    for (float x = 5.f; x > 0; x -= gap)
-        grid.push_back(Eigen::Vector2f(x, 0));
-    grids.push_back(grid);
-    grid.clear();
-
-    /// y轴 负数->0，投影不到->投影到
-    for (float y = -5.f; y < 0; y += gap)
-        grid.push_back(Eigen::Vector2f(0, y));
-    grids.push_back(grid);
-    grid.clear();
-
-    /// y轴 正数->0，投影不到->投影到
-    for (float y = 5.f; y > 0; y -= gap)
-        grid.push_back(Eigen::Vector2f(0, y));
+    // 投影不到->投影到
+    float positive_num = 5.0f, negative_num = -5.0f;
+    for (int i = 0; i < 50000; ++i)
+    {
+        grids[0][i] = Eigen::Vector2f(negative_num, 0);
+        grids[1][i] = Eigen::Vector2f(positive_num, 0);
+        grids[2][i] = Eigen::Vector2f(0, negative_num);
+        grids[3][i] = Eigen::Vector2f(0, positive_num);
+        positive_num -= gap;
+        negative_num += gap;
+    }
     return grids;
 }
 

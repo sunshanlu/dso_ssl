@@ -116,42 +116,43 @@ cv::Mat BilinInterpCVMat(const cv::Mat &data, const cv::Mat &u, const cv::Mat &v
     cv::Mat result(u.rows, u.cols, CV_32F);
 
     int allpixels = u.rows * u.cols;
-    int remains = allpixels % 4;
-    allpixels -= remains;
+
+    // 并行化执行函数
+    auto block_function = [&](const tbb::blocked_range<int> &range)
+    {
+        int remains = (range.end() - range.begin()) % 4;
+        for (int start = range.begin(); start < range.end() - 3; start += 4)
+        {
+            float ut[4], vt[4];
+            int rowt[4], colt[4];
+
+            for (int idx = start; idx < start + 4; ++idx)
+            {
+                int row = idx / u.cols;
+                int col = idx % u.cols;
+                ut[idx - start] = u.at<float>(row, col);
+                vt[idx - start] = v.at<float>(row, col);
+                rowt[idx - start] = row;
+                colt[idx - start] = col;
+            }
+            auto res = BilinInterpSSE(data, ut, vt);
+            for (int i = 0; i < 4; ++i)
+                result.at<float>(rowt[i], colt[i]) = res[i];
+        }
+
+        for (int i = 1; i <= remains; ++i)
+        {
+            int idx = range.end() - i;
+            int row = idx / u.cols;
+            int col = idx % u.cols;
+
+            result.at<float>(row, col) = BilinInterp(data, u.at<float>(row, col), v.at<float>(row, col));
+        }
+    };
 
     // 可以保证allpixels里面的元素被4整除以
-    tbb::parallel_for(tbb::blocked_range<int>(0, allpixels, 4),
-                      [&](const tbb::blocked_range<int> &range)
-                      {
-                          float ut[4], vt[4];
-                          int rowt[4], colt[4];
-
-                          int start = range.begin();
-                          for (int idx = range.begin(); idx < range.end(); ++idx)
-                          {
-                              int row = idx / u.cols;
-                              int col = idx % u.cols;
-                              ut[idx - start] = u.at<float>(row, col);
-                              vt[idx - start] = v.at<float>(row, col);
-                              rowt[idx - start] = row;
-                              colt[idx - start] = col;
-
-                              auto res = BilinInterpSSE(data, ut, vt);
-                              for (int i = 0; i < 4; ++i)
-                                  result.at<float>(rowt[i], colt[i]) = res[i];
-                          }
-                      });
-
-    // 计算剩余的像素点
-    for (int i = 0; i < remains; ++i)
-    {
-        int idx = allpixels + i;
-        int row = idx / u.cols;
-        int col = idx % u.cols;
-
-        result.at<float>(row, col) = BilinInterp(data, u.at<float>(row, col), v.at<float>(row, col));
-    }
+    tbb::parallel_for(tbb::blocked_range<int>(0, allpixels, 4), block_function);
 
     return result;
 }
-} // namespace interpolate
+} // namespace interp

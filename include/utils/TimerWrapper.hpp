@@ -15,6 +15,13 @@ namespace timer
 class TimerWrapper
 {
 public:
+    using SharedPtr = std::shared_ptr<TimerWrapper>;
+
+    TimerWrapper(std::string wrapper_name)
+        : wrapper_name_(std::move(wrapper_name))
+    {
+    }
+
     /**
      * 执行函数并测量其执行时间
      *
@@ -34,17 +41,23 @@ public:
         auto duration = 999999ms;
         decltype(std::forward<F>(func)(std::forward<Args>(args)...)) result;
 
-        try
-        {
-            auto start = std::chrono::high_resolution_clock::now();
-            result = std::forward<F>(func)(std::forward<Args>(args)...);
-            auto end = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        }
-        catch (const std::exception &e)
-        {
-            throw;
-        }
+        /// todo 异常捕获部分在debug的时候不好用，先注释掉，以后在放开。
+        // try
+        // {
+        //     auto start = std::chrono::high_resolution_clock::now();
+        //     result = std::forward<F>(func)(std::forward<Args>(args)...);
+        //     auto end = std::chrono::high_resolution_clock::now();
+        //     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        // }
+        // catch (const std::exception &e)
+        // {
+        //     throw;
+        // }
+
+        auto start = std::chrono::high_resolution_clock::now();
+        result = std::forward<F>(func)(std::forward<Args>(args)...);
+        auto end = std::chrono::high_resolution_clock::now();
+        duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -56,13 +69,13 @@ public:
     }
 
     /// 生成时间消耗表格
-    std::string TimerShow() const;
+    void TimerShow(std::ostream &stream = std::cout) const;
 
 private:
-    std::string wrapper_name_;                    ///< 时间测试名称
-    std::vector<std::string> names_;              ///< 维护函数名称
+    std::string wrapper_name_;                         ///< 时间测试名称
+    std::vector<std::string> names_;                   ///< 维护函数名称
     std::vector<std::chrono::milliseconds> durations_; ///< 维护函数耗时
-    std::mutex mutex_;                            ///< 维护类的线程安全
+    std::mutex mutex_;                                 ///< 维护类的线程安全
 };
 
 } // namespace timer

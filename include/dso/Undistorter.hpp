@@ -50,12 +50,10 @@ public:
         /// 基于yaml的构造函数
         Config(const std::string &yaml_path)
         {
-            YAML::Node info = YAML::LoadFile(yaml_path);
+            info_ = std::make_shared<YAML::Node>(YAML::LoadFile(yaml_path));
 
-            if (!info)
+            if (!info_)
                 throw std::runtime_error("yaml file not found");
-
-            LoadCameraInfo(info);
         }
 
         /// 去畸变函数部分
@@ -82,7 +80,7 @@ public:
         /// 加载相机的畸变参数
         virtual void LoadDistortedParams(const YAML::Node &info)
         {
-            auto distorted_params = info["DistortedMessage"]["DistortedMode"].as<std::vector<float>>();
+            auto distorted_params = info["DistortedMessage"]["DistortedParams"].as<std::vector<float>>();
             distorted_params_->LoadParams(distorted_params);
         }
 
@@ -94,6 +92,7 @@ public:
         DistortionT distorted_type_;                  ///< 相机畸变类型
         DistortedParams::SharedPtr distorted_params_; ///< 畸变参数
         int max_adjust_iters_;                        ///< 坐标轴最大调整次数
+        std::shared_ptr<YAML::Node> info_;            ///< yaml配置文件信息
     };
 
     /// Pinhole 无畸变配置信息
@@ -102,11 +101,13 @@ public:
         PHConfig(const std::string &yaml_path)
             : Config(yaml_path)
         {
+            LoadCameraInfo(*info_);
+            info_ = nullptr;
         }
 
         Eigen::Vector2f Distort(const Eigen::Vector2f &undistorted_point) override { return undistorted_point; }
 
-        void LoadDistortedParams(const YAML::Node &info)
+        void LoadDistortedParams(const YAML::Node &info) override
         {
             distorted_type_ = undistort::DistortionT::Pinhole;
             distorted_params_ = std::make_shared<undistort::PinholeParams>();
@@ -121,11 +122,13 @@ public:
         RT3Config(const std::string &yaml_path)
             : Config(yaml_path)
         {
+            LoadCameraInfo(*info_);
+            info_ = nullptr;
         }
 
         Eigen::Vector2f Distort(const Eigen::Vector2f &undistorted_point) override;
 
-        void LoadDistortedParams(const YAML::Node &info)
+        void LoadDistortedParams(const YAML::Node &info) override
         {
             distorted_type_ = undistort::DistortionT::RadTan3;
             distorted_params_ = std::make_shared<undistort::RadTanParams<3>>();
@@ -140,11 +143,13 @@ public:
         RT5Config(const std::string &yaml_path)
             : Config(yaml_path)
         {
+            LoadCameraInfo(*info_);
+            info_ = nullptr;
         }
 
         Eigen::Vector2f Distort(const Eigen::Vector2f &undistorted_point) override;
 
-        void LoadDistortedParams(const YAML::Node &info)
+        void LoadDistortedParams(const YAML::Node &info) override
         {
             distorted_type_ = undistort::DistortionT::RadTan5;
             distorted_params_ = std::make_shared<undistort::RadTanParams<5>>();
@@ -159,11 +164,13 @@ public:
         FOVConfig(const std::string &yaml_path)
             : Config(yaml_path)
         {
+            LoadCameraInfo(*info_);
+            info_ = nullptr;
         }
 
         Eigen::Vector2f Distort(const Eigen::Vector2f &undistorted_point) override;
 
-        void LoadDistortedParams(const YAML::Node &info)
+        void LoadDistortedParams(const YAML::Node &info) override
         {
             distorted_type_ = undistort::DistortionT::FOV;
             distorted_params_ = std::make_shared<undistort::FOVParams>();
@@ -178,11 +185,13 @@ public:
         KBConfig(const std::string &yaml_path)
             : Config(yaml_path)
         {
+            LoadCameraInfo(*info_);
+            info_ = nullptr;
         }
 
         Eigen::Vector2f Distort(const Eigen::Vector2f &undistorted_point) override;
 
-        void LoadDistortedParams(const YAML::Node &info)
+        void LoadDistortedParams(const YAML::Node &info) override
         {
             distorted_type_ = undistort::DistortionT::KB;
             distorted_params_ = std::make_shared<undistort::KBParams>();
@@ -221,8 +230,9 @@ public:
         if (!is_inited_)
             throw std::runtime_error("PixelUndistorter is not initialized");
 
-        if (distorted_img.type() != CV_32FC1 || distorted_img.type() != CV_32FC3)
+        if (!(distorted_img.type() == CV_32FC1 || distorted_img.type() == CV_32FC3))
             throw std::runtime_error("Input image type must be CV_32FC1 or CV_32FC3");
+
 
         if (distorted_img.empty())
             throw std::runtime_error("Input image is empty");

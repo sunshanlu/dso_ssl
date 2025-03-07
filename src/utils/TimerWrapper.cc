@@ -3,21 +3,20 @@
 namespace timer
 {
 
-
 /**
  * @brief 生成并返回一个包含计时信息的表格字符串表示
- * 
+ *
  * 此函数创建一个表格，格式化并填充计时信息，然后返回表格的字符串表示。
  * 表格中包含了被包装函数的名称、每个函数的执行时间，以及一些格式化设置，如颜色和对齐方式。
- * 
+ *
  * @return std::string 包含计时信息的表格的字符串表示
  */
-std::string TimerWrapper::TimerShow() const
+void TimerWrapper::TimerShow(std::ostream &stream) const
 {
     tabulate::Table table;
     table.format().border_color(tabulate::Color::magenta).locale("zh_CN.UTF-8");
 
-    table.add_row({wrapper_name_});
+    table.add_row({wrapper_name_, ""});
     table[0].format().font_align(tabulate::FontAlign::center).font_color(tabulate::Color::yellow).font_style({tabulate::FontStyle::bold});
 
     table.add_row({"Funciton Name", "Duration / ms"});
@@ -43,7 +42,7 @@ std::string TimerWrapper::TimerShow() const
         ++row_idx;
     }
 
-    return table.str();
+    stream << table << std::endl;
 }
 
 } // namespace timer
