@@ -72,6 +72,8 @@
         "execution": "cpp",
         "shared_mutex": "cpp",
         "cfenv": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "codecvt": "cpp",
+        "filesystem": "cpp"
     }
 }

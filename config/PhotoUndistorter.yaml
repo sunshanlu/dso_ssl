@@ -1,0 +1,9 @@
+# 非线性映射函数setting
+GInvFunction:
+    UseFlag: true
+    FilePath: ./pcalib.txt # 相对于配置文件所在文件夹的相对路径 或者 系统绝对路径
+
+# 渐晕setting
+Vignette:
+    UseFlag: true
+    FilePath: ./vignette.png # 相对于配置文件所在文件夹的相对路径 或者 系统绝对路径

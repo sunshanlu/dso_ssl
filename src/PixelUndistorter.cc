@@ -1,4 +1,4 @@
-#include <dso/Undistorter.hpp>
+#include <dso/PixelUndistorter.hpp>
 
 namespace dso_ssl
 {
