@@ -1,0 +1,3 @@
+
+# 是否使用原始图像梯度平方
+UseDistortedGrad: true

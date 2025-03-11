@@ -1,4 +1,4 @@
-#include "dso/PixelUndistorter.hpp"
+#include "dso/Undistorter.hpp"
 #include "utils/TimerWrapper.hpp"
 
 std::string TEST_IMG_PATH = "/home/lucky-lu/Projects/dso_ssl/tests/res/00011.jpg";

@@ -1,4 +1,5 @@
 #include "utils/MatOperators.hpp"
+#include "utils/ParallelProcess.hpp"
 
 namespace mat_op
 {
@@ -46,70 +47,63 @@ cv::Mat MatOperatorCorrOne(const cv::Mat &src1, const cv::Mat &src2, Operators O
     int allpixels = src1.rows * src1.cols;
     cv::Mat dst(src1.rows, src1.cols, src1.type());
 
-    auto process_func = [&](const tbb::blocked_range<int> &range)
+    auto process_simd = [&](const int &start)
     {
-        float remains = (range.end() - range.begin()) % 4;
+        alignas(16) float src1_data[4], src2_data[4];
+        alignas(16) float dst_data[4];
+        int rows[4], cols[4];
 
-        for (int start = range.begin(); start < range.end() - 3; start += 4)
+        for (int idx = start; idx < start + 4; ++idx)
         {
-            alignas(16) float src1_data[4], src2_data[4];
-            alignas(16) float dst_data[4];
-            int rows[4], cols[4];
-
-            for (int idx = start; idx < start + 4; ++idx)
-            {
-                int row = idx / src1.cols;
-                int col = idx % src1.cols;
-                rows[idx - start] = row;
-                cols[idx - start] = col;
-
-                src1_data[idx - start] = src1.at<float>(row, col);
-                src2_data[idx - start] = src2.at<float>(row, col);
-                if (Operator == Operators::Div && src2_data[idx - start] == 0)
-                    throw std::runtime_error("MatDivideCorrOne: src2 has zero value");
-            }
-
-            auto src1_sse = _mm_load_ps(src1_data);
-            auto src2_sse = _mm_load_ps(src2_data);
-
-            switch (Operator)
-            {
-            case Operators::Add:
-                _mm_store_ps(dst_data, _mm_add_ps(src1_sse, src2_sse));
-                break;
-
-            case Operators::Sub:
-                _mm_store_ps(dst_data, _mm_sub_ps(src1_sse, src2_sse));
-                break;
-
-            case Operators::Mul:
-                _mm_store_ps(dst_data, _mm_mul_ps(src1_sse, src2_sse));
-                break;
-
-            case Operators::Div:
-                _mm_store_ps(dst_data, _mm_div_ps(src1_sse, src2_sse));
-                break;
-
-            default:
-                break;
-            }
-
-            for (int i = 0; i < 4; ++i)
-                dst.at<float>(rows[i], cols[i]) = dst_data[i];
-        }
-
-        for (int i = 1; i <= remains; ++i)
-        {
-            int idx = range.end() - i;
             int row = idx / src1.cols;
             int col = idx % src1.cols;
+            rows[idx - start] = row;
+            cols[idx - start] = col;
 
-            dst.at<float>(row, col) = src1.at<float>(row, col) / src2.at<float>(row, col);
+            src1_data[idx - start] = src1.at<float>(row, col);
+            src2_data[idx - start] = src2.at<float>(row, col);
+            if (Operator == Operators::Div && src2_data[idx - start] == 0)
+                throw std::runtime_error("MatDivideCorrOne: src2 has zero value");
         }
+
+        auto src1_sse = _mm_load_ps(src1_data);
+        auto src2_sse = _mm_load_ps(src2_data);
+
+        switch (Operator)
+        {
+        case Operators::Add:
+            _mm_store_ps(dst_data, _mm_add_ps(src1_sse, src2_sse));
+            break;
+
+        case Operators::Sub:
+            _mm_store_ps(dst_data, _mm_sub_ps(src1_sse, src2_sse));
+            break;
+
+        case Operators::Mul:
+            _mm_store_ps(dst_data, _mm_mul_ps(src1_sse, src2_sse));
+            break;
+
+        case Operators::Div:
+            _mm_store_ps(dst_data, _mm_div_ps(src1_sse, src2_sse));
+            break;
+
+        default:
+            break;
+        }
+
+        for (int i = 0; i < 4; ++i)
+            dst.at<float>(rows[i], cols[i]) = dst_data[i];
     };
 
-    tbb::parallel_for(tbb::blocked_range<int>(0, allpixels, 4), process_func);
+    auto process_single = [&](const int &idx)
+    {
+        int row = idx / src1.cols;
+        int col = idx % src1.cols;
 
+        dst.at<float>(row, col) = src1.at<float>(row, col) / src2.at<float>(row, col);
+    };
+
+    parallel::ParallelWrapper(0, allpixels, 4, process_simd, process_single);
     return dst;
 }
 

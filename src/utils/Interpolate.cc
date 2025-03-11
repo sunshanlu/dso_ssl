@@ -1,4 +1,5 @@
 #include "utils/Interpolate.hpp"
+#include "utils/ParallelProcess.hpp"
 
 namespace interp
 {
@@ -117,41 +118,35 @@ cv::Mat BilinInterpCVMat(const cv::Mat &data, const cv::Mat &u, const cv::Mat &v
 
     int allpixels = u.rows * u.cols;
 
-    // 并行化执行函数
-    auto block_function = [&](const tbb::blocked_range<int> &range)
+    auto process_simd = [&](const int &start)
     {
-        int remains = (range.end() - range.begin()) % 4;
-        for (int start = range.begin(); start < range.end() - 3; start += 4)
-        {
-            float ut[4], vt[4];
-            int rowt[4], colt[4];
+        float ut[4], vt[4];
+        int rowt[4], colt[4];
 
-            for (int idx = start; idx < start + 4; ++idx)
-            {
-                int row = idx / u.cols;
-                int col = idx % u.cols;
-                ut[idx - start] = u.at<float>(row, col);
-                vt[idx - start] = v.at<float>(row, col);
-                rowt[idx - start] = row;
-                colt[idx - start] = col;
-            }
-            auto res = BilinInterpSSE(data, ut, vt);
-            for (int i = 0; i < 4; ++i)
-                result.at<float>(rowt[i], colt[i]) = res[i];
-        }
-
-        for (int i = 1; i <= remains; ++i)
+        for (int idx = start; idx < start + 4; ++idx)
         {
-            int idx = range.end() - i;
             int row = idx / u.cols;
             int col = idx % u.cols;
-
-            result.at<float>(row, col) = BilinInterp(data, u.at<float>(row, col), v.at<float>(row, col));
+            ut[idx - start] = u.at<float>(row, col);
+            vt[idx - start] = v.at<float>(row, col);
+            rowt[idx - start] = row;
+            colt[idx - start] = col;
         }
+        auto res = BilinInterpSSE(data, ut, vt);
+        for (int i = 0; i < 4; ++i)
+            result.at<float>(rowt[i], colt[i]) = res[i];
     };
 
-    // 可以保证allpixels里面的元素被4整除以
-    tbb::parallel_for(tbb::blocked_range<int>(0, allpixels, 4), block_function);
+    auto process_single = [&](const int &idx)
+    {
+        int row = idx / u.cols;
+        int col = idx % u.cols;
+
+        result.at<float>(row, col) = BilinInterp(data, u.at<float>(row, col), v.at<float>(row, col));
+    };
+
+    // 并行化执行函数
+    parallel::ParallelWrapper(0, allpixels, 4, process_simd, process_single);
 
     return result;
 }

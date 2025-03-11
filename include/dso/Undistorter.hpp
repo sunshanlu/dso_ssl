@@ -2,14 +2,17 @@
 
 #include <algorithm>
 #include <execution>
+#include <filesystem>
 #include <memory>
 #include <numeric>
 
+#include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 #include <tbb/parallel_for_each.h>
 #include <yaml-cpp/yaml.h>
 
 #include "utils/Interpolate.hpp"
+#include "utils/MatOperators.hpp"
 #include "utils/PixelUndistorted.hpp"
 
 namespace dso_ssl
@@ -208,6 +211,12 @@ public:
         Initialize();
     }
 
+    /// 获取u坐标映射
+    const cv::Mat &GetRemapX() const { return remap_x_; }
+
+    /// 获取v坐标映射
+    const cv::Mat &GetRemapY() const { return remap_y_; }
+
     /**
      * @brief 对给定的畸变图像进行像素位置去畸变处理
      *
@@ -232,7 +241,6 @@ public:
 
         if (!(distorted_img.type() == CV_32FC1 || distorted_img.type() == CV_32FC3))
             throw std::runtime_error("Input image type must be CV_32FC1 or CV_32FC3");
-
 
         if (distorted_img.empty())
             throw std::runtime_error("Input image is empty");
@@ -295,6 +303,13 @@ public:
     /// 构建映射关系表 remap_x_ 和 remap_y_
     void BuildRemap();
 
+    /// 使用remapx和remapy获取畸变坐标系下的像素坐标
+    void GetDistortedPixel(const int &undistorted_y, const int &undistorted_x, float &distorted_y, float &distorted_x)
+    {
+        distorted_y = remap_y_.at<float>(undistorted_y, undistorted_x);
+        distorted_x = remap_x_.at<float>(undistorted_y, undistorted_x);
+    }
+
 private:
     /// 找到所有极限轴上的点，都能投影到畸变图像上的归一化坐标轴位置
     void ComputeRealAxis(float &x_max, float &y_max, float &x_min, float &y_min);
@@ -313,6 +328,192 @@ private:
     K target_K_;               ///< 无畸变图像的相机内参
     cv::Mat remap_x_;          ///< 无畸变图像坐标存储的畸变图像x映射
     cv::Mat remap_y_;          ///< 无畸变图像坐标存储的畸变图像y映射
+};
+
+class PhotoUndistorter
+{
+public:
+    using SharedPtr = std::shared_ptr<PhotoUndistorter>;
+
+    /// 光度去畸变器的配置
+    struct Config
+    {
+        using SharedPtr = std::shared_ptr<Config>;
+
+        /**
+         * @brief 根据输入的file_path构造光度去畸变器的配置
+         *
+         * @param file_path 配置文件的路径
+         *
+         * @throw std::runtime_error 当配置文件，配置文件中指定的文件路径不存在时抛出运行时错误。
+         *
+         * 该构造函数接收一个配置文件路径，然后根据该路径加载配置信息。它首先尝试获取配置文件的绝对路径，
+         * 并检查文件是否存在。如果文件不存在，将抛出一个运行时错误。接着，使用YAML库加载配置文件内容，并从中
+         * 提取配置信息。根据配置信息中的标志决定是否加载特定的功能参数。
+         */
+        Config(std::string file_path);
+
+        /**
+         * 加载GInv函数的参数
+         *
+         * 本函数从指定的文件路径中读取GInv函数的参数，并确保参数数量正确
+         * 参数被读入到一个预分配了256个元素空间的向量中，如果读取的参数数量不等于256，
+         * 则抛出运行时错误
+         *
+         * @param ginv_params_path 包含GInv函数参数的文件路径
+         */
+        void LoadGInvFunParams(const std::string &ginv_params_path);
+
+        /**
+         * @brief 标准化GInv函数
+         *
+         * 在区间[0,255]之间分布
+         */
+        void NormalizeGInv();
+
+        /**
+         * @brief 计算 dG / dI
+         *
+         * 根据GInv函数计算
+         *
+         * @return float dG / dI
+         */
+        float ComputeGJacobian(float Ivalue);
+
+        /**
+         * @brief 根据Ginv 计算 G 函数
+         *
+         */
+        void ComputeGFunction();
+
+        /**
+         * @brief 标准化GInv函数，使用了自定义并行化模板
+         *
+         * 在区间[0,255]之间分布
+         */
+        void NormalizeGInvParallel();
+
+        /**
+         * @brief 标准化渐晕map图
+         *
+         * 在区间[0, 1]之间分布
+         */
+        void NormalizeVignette();
+
+        cv::Mat vignette_map_;         ///< 渐晕map图
+        std::vector<float> gfunc_inv_; ///< 非线性响应函数G^-1
+        std::vector<float> gfunc_;     ///< 非线性响应函数G
+        bool vignette_flag_;           ///< 是否使用渐晕处理
+        bool gfunc_inv_flag_;          ///< 是否使用非线性响应函数G^-1
+    };
+
+    PhotoUndistorter(Config::SharedPtr config)
+        : config_(std::move(config))
+    {
+    }
+
+    const cv::Mat &GetVignette() const { return config_->vignette_map_; }
+
+    /**
+     * @brief 计算 dG / d(I'v)
+     *
+     * 根据GInv函数计算，非线性响应函数相对于I'v的雅可比矩阵
+     *
+     * @return float dG / d(I'v)
+     */
+    float ComputeGJacobian(float Ivalue) { return config_->ComputeGJacobian(Ivalue); }
+
+    /**
+     * @brief Get the Vigneete Value object
+     *
+     * @param x         输入畸变像素坐标系下的x坐标
+     * @param y         输入畸变像素坐标系下的y坐标
+     * @return float    输出的渐晕值
+     */
+    const float &GetVigneeteValue(const int &x, const int &y) { return config_->vignette_map_.at<float>(y, x); }
+
+    /**
+     * @brief 光度校正核心函数
+     *
+     * 1. 对非线性响应函数G^-1进行校正
+     * 2. 对渐晕map图进行校正
+     * 3. 适合单通道和三通道图像的光度矫正（CV_8U, CV_8UC3）
+     *
+     * @param distorted_img 输入的去畸变图像
+     * @return cv::Mat  输出的去光度畸变的校正图像
+     */
+    cv::Mat Undistort(const cv::Mat &distorted_img)
+    {
+        auto ginv_undistorted_img = GinvUndistort(distorted_img);
+        return VignUndistort(ginv_undistorted_img);
+    }
+
+    /**
+     * @brief 实现图像去畸变功能，使用非线性映射的逆过程对畸变图像进行光度校正
+     *
+     * @param distorted_img 输入的畸变图像，必须是8U或8UC3类型（整个畸变矫正的最始端）
+     * @return cv::Mat 输出的去G作用后的图像，类型变成了Float
+     *
+     * @note 即便配置中指定没有GInv函数，该函数仍然会对输入图像进行类型转换为Float
+     */
+    cv::Mat GinvUndistort(const cv::Mat &distorted_img);
+
+    /**
+     * @brief 渐晕校正
+     *
+     * @param distorted_img 输入的畸变图像，必须是32F或32FC3类型
+     * @return cv::Mat  输出的去渐晕作用后的图像，类型与输入类型一致
+     */
+    cv::Mat VignUndistort(const cv::Mat &distorted_img);
+
+private:
+    /**
+     * @brief 对单通道CV_32F进行处理
+     *
+     * @param distorted_img 输入的单通道，类型为CV_32F的图像
+     * @return cv::Mat  输出的去G作用后的图像，类型与输入类型一致
+     */
+    cv::Mat GinvUndistortOne(const cv::Mat &distorted_img);
+
+    Config::SharedPtr config_; ///< 光度去畸变器配置
+};
+
+class Undistorter
+{
+public:
+    using SharedPtr = std::shared_ptr<Undistorter>;
+
+    struct Config
+    {
+        using SharedPtr = std::shared_ptr<Config>;
+
+        Config(const std::string &file_path)
+        {
+            auto info = YAML::LoadFile(file_path);
+            use_origin_grad_ = info["UseDistortedGrad"].as<bool>();
+        }
+
+        bool use_origin_grad_;
+    };
+
+    Undistorter(PixelUndistorter::Config::SharedPtr pixel_config, PhotoUndistorter::Config::SharedPtr photo_config, Config::SharedPtr config);
+
+    /**
+     * @brief 去畸变器核心去畸变函数
+     *
+     * pixel_undistorted_image 像素去畸变图像作为中间产物输出，
+     * 与DSO源码里面形成了鲜明的对比，使用先像素去畸变，然后光度去畸变过程
+     *
+     * @param distorted_image           输入的畸变图像
+     * @param pixel_undistorted_image   输出的去像素畸变图像
+     * @return cv::Mat 输出的去畸变图像
+     */
+    cv::Mat Undistort(const cv::Mat &distorted_image, cv::Mat &pixel_undistorted_image);
+
+private:
+    Config::SharedPtr config_;
+    PixelUndistorter::SharedPtr pixel_undistorter_;
+    PhotoUndistorter::SharedPtr photo_undistorter_;
 };
 
 } // namespace dso_ssl

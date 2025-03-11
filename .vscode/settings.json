@@ -74,6 +74,11 @@
         "cfenv": "cpp",
         "*.ipp": "cpp",
         "codecvt": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "csignal": "cpp",
+        "any": "cpp",
+        "strstream": "cpp",
+        "future": "cpp",
+        "valarray": "cpp"
     }
 }

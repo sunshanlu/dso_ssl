@@ -26,4 +26,5 @@ ImageSize:
         Width: 640
         Height: 480
 
-MaxIterations: 15 # 计算虚拟相机内参的最大迭代次数
+# 计算虚拟相机内参的最大迭代次数
+MaxIterations: 15

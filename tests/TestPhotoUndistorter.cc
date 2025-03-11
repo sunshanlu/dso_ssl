@@ -1,6 +1,6 @@
 #include <filesystem>
 
-#include "dso/PhotoUndistorter.hpp"
+#include "dso/Undistorter.hpp"
 #include "utils/TimerWrapper.hpp"
 
 std::string TEST_IMG_PATH = "./tests/res/00011.jpg";
