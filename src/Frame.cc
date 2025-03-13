@@ -120,14 +120,7 @@ void Frame::MakeSqureGrad(const cv::Mat &only_pixel_undistorted_image)
         squre_grad_.at<float>(row, col) = item[1] * item[1] + item[2] * item[2];
     };
 
-    // 调试更改
     parallel::ParallelWrapper(0, allpixels, 4, process_simd, process_single);
-
-    double max_value;
-    cv::minMaxLoc(squre_grad_, nullptr, &max_value);
-    cv::imshow("squre_grad", squre_grad_ / max_value);
-    cv::waitKey(0);
-    cv::destroyAllWindows();
 }
 
 } // namespace dso_ssl

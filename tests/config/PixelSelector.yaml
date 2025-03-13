@@ -1,0 +1,16 @@
+# 像素选择器的配置文件
+
+FirstLayerConfig:
+    InitPotinalSize: 3          # 第一层金字塔初始化的pot大小，会动态变化
+    DownScaleFactor: 0.75       # 第一层金字塔梯度阈值下采样比例
+    GradPatchSize: 32           # 第一层金字塔梯度计算分块大小
+    GradThreshBias: 7           # 第一层金字塔计算GradPatchSize * GradPatchSize像素块的梯度阈值bias
+    GradThreshPercentile: 0.5   # 第一层金字塔计算GradPatchSize * GradPatchSize像素块的梯度阈值百分比
+    RecursionDepth: 3           # 第一层金字塔提点的递归深度
+
+OtherLayerConfig:
+    InitPotinalSize: 5          # 其他层金字塔初始化的pot大小，会动态变化
+    GradThresh: 10              # 其他层金字塔梯度阈值
+    GradFactorThresh: 0.75      # 其他层金字塔梯度阈值下采样比例
+    RecursionDepth: 5           # 其他层金字塔提点的递归深度
+

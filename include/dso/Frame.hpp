@@ -49,6 +49,10 @@ public:
 
     Frame(const Config::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image);
 
+    const std::vector<cv::Mat> &GetPyrdImageAndGrads() const { return pyrd_image_and_grads_; }
+    
+    const cv::Mat &GetSqureGrad() const { return squre_grad_; }
+
 private:
     /// 构造图像金字塔 --> 4合1 + 均值滤波
     void MakePyrdImages(const cv::Mat &first_layer_image);

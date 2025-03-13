@@ -93,7 +93,7 @@ void ShowPyraidImagesAndGrads(Frame::SharedPtr frameptr)
 int main()
 {
     NormFilePath();
-    timer::TimerWrapper timer_wrapper("Undistorter Test");
+    timer::TimerWrapper timer_wrapper("Frame Test");
 
     PhotoUndistorter::Config::SharedPtr photo_config = std::make_shared<PhotoUndistorter::Config>(PHOTO_CONFIG_PATH);
     PixelUndistorter::Config::SharedPtr pixel_config = std::make_shared<PixelUndistorter::FOVConfig>(PIXEL_CONFIG_PATH);

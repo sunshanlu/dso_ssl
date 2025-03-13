@@ -14,3 +14,7 @@ target_include_directories(TestUndistorter PRIVATE ${PROJECT_SOURCE_DIR}/include
 add_executable(TestFrame TestFrame.cc)
 target_link_libraries(TestFrame dso-ssl)
 target_include_directories(TestFrame PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
+add_executable(TestPixelSelector TestPixelSelector.cc)
+target_link_libraries(TestPixelSelector dso-ssl)
+target_include_directories(TestPixelSelector PRIVATE ${PROJECT_SOURCE_DIR}/include)
