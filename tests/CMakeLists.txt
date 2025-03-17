@@ -18,3 +18,7 @@ target_include_directories(TestFrame PRIVATE ${PROJECT_SOURCE_DIR}/include)
 add_executable(TestPixelSelector TestPixelSelector.cc)
 target_link_libraries(TestPixelSelector dso-ssl)
 target_include_directories(TestPixelSelector PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
+add_executable(TestProject TestProject.cc)
+target_link_libraries(TestProject dso-ssl)
+target_include_directories(TestProject PRIVATE ${PROJECT_SOURCE_DIR}/include)

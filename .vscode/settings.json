@@ -79,7 +79,9 @@
         "any": "cpp",
         "strstream": "cpp",
         "future": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "*.txx": "cpp",
+        "geometry": "cpp"
     },
     "C_Cpp.default.compilerPath": "/usr/bin/aarch64-linux-gnu-gcc"
 }
