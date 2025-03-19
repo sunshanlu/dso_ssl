@@ -22,3 +22,5 @@ target_include_directories(TestPixelSelector PRIVATE ${PROJECT_SOURCE_DIR}/inclu
 add_executable(TestProject TestProject.cc)
 target_link_libraries(TestProject dso-ssl)
 target_include_directories(TestProject PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
+add_subdirectory(TestInitializer)

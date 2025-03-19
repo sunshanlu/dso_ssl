@@ -34,7 +34,55 @@ float BilinInterp(const cv::Mat &data, float u, float v);
  * @param v     包含4个插值点的y坐标的数组
  * @return std::vector<float> 包含4个插值结果的vector
  */
-std::vector<float> BilinInterpSSE(const cv::Mat &data, float u[4], float v[4]);
+template <typename T>
+std::vector<float> BilinInterpSSE(const cv::Mat &data, const T &u, const T &v)
+{
+    assert(data.type() == CV_32F && "input data mast be CV_32F");
+
+    std::vector<float> result(4);
+    if (!__builtin_cpu_supports("sse"))
+    {
+        for (int i = 0; i < 4; ++i)
+            result[i] = BilinInterp(data, u[i], v[i]);
+        return result;
+    }
+
+    alignas(16) float Ip0[4], Ip1[4], Ip2[4], Ip3[4], dx[4], dy[4];
+    for (int i = 0; i < 4; ++i)
+    {
+        int ix = static_cast<int>(u[i]);
+        int iy = static_cast<int>(v[i]);
+
+        if (ix < 0 || iy < 0 || ix >= data.cols - 1 || iy >= data.rows - 1)
+            throw std::out_of_range("coordinate out of range");
+
+        Ip0[i] = data.at<float>(iy + 1, ix + 1);
+        Ip1[i] = data.at<float>(iy, ix + 1);
+        Ip2[i] = data.at<float>(iy, ix);
+        Ip3[i] = data.at<float>(iy + 1, ix);
+
+        dx[i] = u[i] - ix;
+        dy[i] = v[i] - iy;
+    }
+
+    __m128 Ip0_ = _mm_load_ps(Ip0);
+    __m128 Ip1_ = _mm_load_ps(Ip1);
+    __m128 Ip2_ = _mm_load_ps(Ip2);
+    __m128 Ip3_ = _mm_load_ps(Ip3);
+    __m128 dx_ = _mm_load_ps(dx);
+    __m128 dy_ = _mm_load_ps(dy);
+    __m128 one = _mm_set1_ps(1.0f);
+
+    __m128 Ipl_ = _mm_add_ps(_mm_mul_ps(Ip2_, _mm_sub_ps(one, dy_)), _mm_mul_ps(Ip3_, dy_));
+    __m128 Ipr_ = _mm_add_ps(_mm_mul_ps(Ip1_, _mm_sub_ps(one, dy_)), _mm_mul_ps(Ip0_, dy_));
+
+    __m128 Ip = _mm_add_ps(_mm_mul_ps(Ipl_, _mm_sub_ps(one, dx_)), _mm_mul_ps(Ipr_, dx_));
+
+    alignas(16) float temp[4];
+    _mm_store_ps(temp, Ip);
+    std::copy(temp, temp + 4, result.begin());
+    return result;
+}
 
 /**
  * @brief 使用双线性插值处理图像数据

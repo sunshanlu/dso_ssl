@@ -9,9 +9,9 @@ class IdepthVertex : public g2o::BaseVertex<1, double>
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-    using Vector2d = Eigen::Vector2d;
+    using Vector2f = Eigen::Vector2f;
 
-    IdepthVertex(double init_estimate, Vector2d pixel_position)
+    IdepthVertex(double init_estimate, Vector2f pixel_position)
         : pixel_position_(std::move(pixel_position))
     {
         _estimate = std::move(init_estimate);
@@ -21,7 +21,7 @@ public:
 
     void setToOriginImpl() override { _estimate = 0; }
 
-    Vector2d pixel_position_; ///< host帧像素位置
+    Vector2f pixel_position_; ///< host帧像素位置
 };
 
 } // namespace dso_ssl
