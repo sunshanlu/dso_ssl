@@ -13,36 +13,46 @@ namespace timer
  */
 void TimerWrapper::TimerShow(std::ostream &stream) const
 {
-    tabulate::Table table;
-    table.format().border_color(tabulate::Color::magenta).locale("zh_CN.UTF-8");
+  using namespace tabulate;
+  using Row_t = Table::Row_t;
 
-    table.add_row({wrapper_name_, ""});
-    table[0].format().font_align(tabulate::FontAlign::center).font_color(tabulate::Color::yellow).font_style({tabulate::FontStyle::bold});
+  Table wrapper_name;
+  wrapper_name.format().locale("zh_CN.UTF-8").hide_border().width(60);
+  wrapper_name.add_row(Row_t{wrapper_name_});
+  wrapper_name[0].format().font_align(FontAlign::center).font_color(Color::yellow).font_style({FontStyle::bold, FontStyle::italic});
+  std::cout << wrapper_name;
 
-    table.add_row({"Funciton Name", "Duration / ms"});
-    table[1].format().font_color(tabulate::Color::yellow).font_style({tabulate::FontStyle::bold});
+  Table content;
+  content.format().locale("zh_CN.UTF-8").border_color(Color::magenta);
 
-    bool first_data_row = false;
-    int row_idx = 2;
-    for (std::size_t idx = 0; idx < names_.size(); ++idx)
-    {
-        std::string duration_str = std::to_string(durations_[idx].count());
-        if (durations_[idx] == 999999ms)
-            duration_str = "Execution Error";
+  content.add_row({"Funciton Name", "Duration / ms"});
+  content[0].format().font_color(Color::yellow).font_style({FontStyle::bold, FontStyle::italic});
 
-        table.add_row({names_[idx], std::to_string(durations_[idx].count())});
-        table[row_idx].format().font_color(tabulate::Color::green);
-        if (duration_str == "Execution Error")
-            table[row_idx][1].format().font_background_color(tabulate::Color::red);
+  bool first_data_row = false;
+  int row_idx = 1;
+  for (std::size_t idx = 0; idx < names_.size(); ++idx)
+  {
+    std::string duration_str = std::to_string(durations_[idx].count());
+    if (durations_[idx] == 999999ms)
+      duration_str = "Execution Error";
 
-        if (first_data_row)
-            table[row_idx].format().hide_border_top();
+    content.add_row({names_[idx], std::to_string(durations_[idx].count())});
+    content[row_idx].format().font_color(Color::green).font_style({FontStyle::italic});
+    if (duration_str == "Execution Error")
+      content[row_idx][1].format().font_background_color(Color::red);
 
-        first_data_row = true;
-        ++row_idx;
-    }
+    if (first_data_row)
+      content[row_idx].format().hide_border_top();
 
-    stream << table << std::endl;
+    first_data_row = true;
+    ++row_idx;
+  }
+
+  content.format().hide_border_top().border_color(Color::magenta);
+  content.column(0).format().font_align(FontAlign::center).width(40);
+  content.column(1).format().font_align(FontAlign::center).width(20);
+
+  std::cout << content << std::endl;
 }
 
 } // namespace timer

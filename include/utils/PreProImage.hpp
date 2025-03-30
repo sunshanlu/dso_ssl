@@ -23,6 +23,10 @@ void MakeGradOneLayer(const cv::Mat &input_image, cv::Mat &grad_x, cv::Mat &grad
 /**
  * @brief 对图像进行分块处理，使用中心分块的方案
  *
+ * patch_function 函数会对块进行处理，但是其线程安全与否，需要patch_function内部保证
+ * 使用的执行策略为 c++ 17 std::execution::par --> 在patch_function内部遵循代码执行顺序
+ *
+ *
  * @tparam F 函数模板类型
  * @param input_image       输入的待分块图像
  * @param patch_function    输入的每块图像需要的处理函数
@@ -38,6 +42,6 @@ void SegmentImage(const cv::Mat &input_image, F &&patch_function, const int &pat
         for (int col = col_start; col < input_image.cols - patch_size + 1; col += patch_size)
             pro_positons.emplace_back(col, row);
 
-    std::for_each(std::execution::par_unseq, pro_positons.begin(), pro_positons.end(), [&](const Eigen::Vector2i &position) { patch_function(position); });
+    std::for_each(std::execution::par, pro_positons.begin(), pro_positons.end(), [&](const Eigen::Vector2i &position) { patch_function(position); });
 }
 } // namespace prepro_image

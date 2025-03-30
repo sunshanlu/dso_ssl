@@ -1,10 +1,25 @@
 # 初始化器
-
-PyraidLevelsUsed: 5 # 使用的图像金字塔的层级
-NeighborNum: 10     # 获取邻居点的数目
-SelectDensities:    # 图像金字塔的点选密度
+PyraidLevelsUsed: 4       # 使用的图像金字塔的层级
+NeighborNum: 10           # 获取邻居点的数目
+SelectDensities:          # 图像金字塔的点选密度
   - 0.03
   - 0.05
   - 0.15
   - 0.5
-  - 0.8
+
+MaxIterations:            # 每层金字塔的迭代次数
+  - 5
+  - 5
+  - 10
+  - 10
+
+RegWeight: 0.8            # 逆深度中位数的信息权重
+Verbose: True             # 是否显示优化verbose信息
+ContinusSnapTimes: 5      # 连续满足Tji条件
+HuberThreshold: 9         # Huber核阈值，针对1维情况下
+OutlierThreshold: 1100    # 外点判断阈值，针对单个光度误差点
+InlierRatio: 0.1          # 内点判断阈值，判断某个层级金字塔优化的内容是否成立
+AlphaW: 22500             # tji不满足条件时的 点逆深度正则化和 tji 正则化的权重
+Alpha: 1                  # tji满足条件时的 点逆深度正则化权重
+TransjiThreshold: 0.006   # tji阈值
+MakeSenseRatio: 0.7       # 当某个层级的逆深度被优化次数 / 实际优化的次数 比例阈值

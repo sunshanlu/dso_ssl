@@ -11,15 +11,15 @@ DistortedMessage:
 CameraIntrinsics:
     Fx: 685.720714351
     Fy: 685.636463463
-    Cx: 631.358137965
-    Cy: 512.418472293
+    Cx: 630.858137965
+    Cy: 511.918472293
 
 # 图像尺寸
 ImageSize:
     # 原始图像尺寸
     SourceImgSz:
         Width: 1280
-        Height: 720
+        Height: 1024
 
     # 虚拟图像尺寸
     TargetImgSz:

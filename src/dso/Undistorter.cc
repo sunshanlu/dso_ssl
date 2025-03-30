@@ -114,7 +114,7 @@ void PixelUndistorter::BuildRemap()
     std::vector<int> map_idx(pixels_num, 0);
     std::iota(map_idx.begin(), map_idx.end(), 0);
 
-    std::for_each(std::execution::par_unseq, map_idx.begin(), map_idx.end(),
+    std::for_each(std::execution::par, map_idx.begin(), map_idx.end(),
                   [&](const int &idx)
                   {
                       int v = idx / config_->target_size_[0];
@@ -256,7 +256,7 @@ void PixelUndistorter::ComputeLimitAxis(float &lx_max, float &ly_max, float &lx_
     std::iota(indices.begin(), indices.end(), 0);
 
     std::vector<Grid> grids = CreateMeshgrid();
-    std::for_each(std::execution::par_unseq, indices.begin(), indices.end(),
+    std::for_each(std::execution::par, indices.begin(), indices.end(),
                   [&](const int &idx)
                   {
                       const auto &grid = grids[idx];
@@ -436,7 +436,7 @@ cv::Mat PhotoUndistorter::GinvUndistort(const cv::Mat &distorted_img)
 
     std::vector<int> indices(channels.size());
     std::iota(indices.begin(), indices.end(), 0);
-    std::for_each(std::execution::par_unseq, indices.begin(), indices.end(), process_func);
+    std::for_each(std::execution::par, indices.begin(), indices.end(), process_func);
 
     if (distorted_img.channels() == 3)
         cv::merge(out_channels, ginv_undistorted_img);
@@ -487,7 +487,7 @@ cv::Mat PhotoUndistorter::GinvUndistortOne(const cv::Mat &distorted_img)
         ginv_undistorted_img.at<float>(row, col) = config_->gfunc_inv_[static_cast<int>(color)];
     };
 
-    std::for_each(std::execution::par_unseq, indices.begin(), indices.end(), process_func);
+    std::for_each(std::execution::par, indices.begin(), indices.end(), process_func);
     return ginv_undistorted_img;
 }
 

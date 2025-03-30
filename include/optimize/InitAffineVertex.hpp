@@ -22,6 +22,10 @@ public:
     }
 
     void setToOriginImpl() override { _estimate = Vector2d::Zero(); }
+
+    bool read(std::istream &is) override { return false; }
+
+    bool write(std::ostream &os) const override { return false; }
 };
 
 } // namespace dso_ssl

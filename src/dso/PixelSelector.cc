@@ -412,7 +412,7 @@ void PixelSelector::SelectFirstLayerInternal(const int &potinal, const cv::Mat &
 
     std::vector<int> indices(pre_positions.size(), 0);
     std::iota(indices.begin(), indices.end(), 0);
-    std::for_each(std::execution::par_unseq, indices.begin(), indices.end(), pot4_pot4_process);
+    std::for_each(std::execution::par, indices.begin(), indices.end(), pot4_pot4_process);
 
     selected_points_out.clear();
     for (int idx = 0; idx < allpixels; ++idx)
@@ -586,7 +586,7 @@ void PixelSelector::SelectOtherLayerInternal(const int &potinal, const cv::Mat &
     std::vector<int> indices(pre_postions.size(), 0);
     std::iota(indices.begin(), indices.end(), 0);
 
-    std::for_each(std::execution::par_unseq, indices.begin(), indices.end(), pot_process);
+    std::for_each(std::execution::par, indices.begin(), indices.end(), pot_process);
 
     selected_points_out.clear();
     for (int idx = 0; idx < selected_points.size(); ++idx)

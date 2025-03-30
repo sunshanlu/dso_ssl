@@ -15,7 +15,7 @@
 #include "utils/PreProImage.hpp"
 #include "utils/TimerWrapper.hpp"
 
-std::string TEST_IMG_PATH = "./tests/res/00011.jpg";
+std::string TEST_IMG_PATH = "./tests/res/00001.jpg";
 std::string PHOTO_CONFIG_PATH = "./tests/config/PhotoUndistorter.yaml";
 std::string PIXEL_CONFIG_PATH = "./tests/config/FOVPixelUndistorter.yaml";
 std::string UNDIS_CONFIG_PATH = "./tests/config/Undistorter.yaml";
@@ -51,12 +51,9 @@ void ShowPyraidImagesAndGrads(Frame::SharedPtr frameptr)
         std::vector<cv::Mat> image_and_grad_vec;
         cv::split(image_and_grad, image_and_grad_vec);
 
-        double max_value1, max_value2;
-        cv::minMaxLoc(image_and_grad_vec[1], nullptr, &max_value1);
-        cv::minMaxLoc(image_and_grad_vec[2], nullptr, &max_value2);
-
-        image_and_grad_vec[1] = image_and_grad_vec[1] / max_value1 * 255;
-        image_and_grad_vec[2] = image_and_grad_vec[2] / max_value2 * 255;
+        // 把梯度部分，转换为正的值
+        image_and_grad_vec[1] = cv::abs(image_and_grad_vec[1]);
+        image_and_grad_vec[2] = cv::abs(image_and_grad_vec[2]);
 
         image_and_grad_vec[0].convertTo(image_and_grad_vec[0], CV_8U);
         image_and_grad_vec[1].convertTo(image_and_grad_vec[1], CV_8U);
@@ -77,11 +74,7 @@ void ShowPyraidImagesAndGrads(Frame::SharedPtr frameptr)
         cv::imshow("Image pyrd grady " + std::to_string(idx), pyrd_grady[idx]);
 
     // 展示梯度平方和
-    cv::Mat squre_grad;
-    double max_squre_value;
-    cv::minMaxLoc(frameptr->squre_grad_, nullptr, &max_squre_value);
-    squre_grad = frameptr->squre_grad_ / max_squre_value * 255;
-
+    cv::Mat squre_grad = frameptr->squre_grad_;
     squre_grad.convertTo(squre_grad, CV_8U);
     cv::imshow("Image squre grad", squre_grad);
 
@@ -105,28 +98,6 @@ int main()
     cv::Mat distorted_image = cv::imread(TEST_IMG_PATH, cv::IMREAD_GRAYSCALE);
     cv::Mat only_pixel_undistorted_image;
 
-    // 金字塔核心函数测试
-    // cv::Mat pyrad_test, grad_x, grad_y;
-    // distorted_image.convertTo(pyrad_test, CV_32FC1);
-    // auto scale_image = prepro_image::MakePyrdOneLayer(pyrad_test);
-    // prepro_image::MakeGradOneLayer(scale_image, grad_x, grad_y);
-    // scale_image.convertTo(scale_image, CV_8U);
-
-    // double max_value_grad_x, max_value_grad_y;
-    // cv::minMaxLoc(grad_x, nullptr, &max_value_grad_x);
-    // cv::minMaxLoc(grad_y, nullptr, &max_value_grad_y);
-
-    // grad_x = grad_x / max_value_grad_x * 255;
-    // grad_y = grad_y / max_value_grad_y * 255;
-
-    // grad_x.convertTo(grad_x, CV_8U);
-    // grad_y.convertTo(grad_y, CV_8U);
-    // cv::imshow("scale image", scale_image);
-    // cv::imshow("grad x", grad_x);
-    // cv::imshow("grad y", grad_y);
-    // cv::waitKey(0);
-    // cv::destroyAllWindows();
-
     cv::Mat undistorted_image = timer_wrapper.ExecuteAndMeasure("Undistorter::Distort", [&]() -> cv::Mat
                                                                 { return undistorter->Undistort(distorted_image, only_pixel_undistorted_image); });
 
@@ -134,7 +105,7 @@ int main()
                                                              [&]() -> Frame::SharedPtr
                                                              {
                                                                  auto frame =
-                                                                     std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image);
+                                                                     std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image, 0, 0);
                                                                  return frame;
                                                              });
 

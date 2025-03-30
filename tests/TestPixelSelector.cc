@@ -127,14 +127,14 @@ int main()
     cv::Mat only_pixel_undistorted_image;
 
     cv::Mat undistorted_image = undistorter->Undistort(distorted_image, only_pixel_undistorted_image);
-    Frame::SharedPtr frame = std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image);
+    Frame::SharedPtr frame = std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image, 0, 0);
 
     auto image_and_grads = frame->GetPyrdImageAndGrads();
     auto squre_grad = frame->GetSqureGrad();
 
     float densities[] = {0.03, 0.05, 0.15, 0.5, 0.8};
 
-    for (int layer = 0; layer < 5; ++layer)
+    for (int layer = 0; layer < frame_config->pyra_levels_; ++layer)
     {
         PixelSelector::Vector2iArray selected_points;
         std::vector<cv::Mat> image_and_grads_vec;

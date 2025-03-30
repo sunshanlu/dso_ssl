@@ -284,6 +284,14 @@ public:
         BuildRemap();
     }
 
+    void GetTargetK(float &fx, float &fy, float &cx, float &cy)
+    {
+        fx = target_K_.fx;
+        fy = target_K_.fy;
+        cx = target_K_.cx;
+        cy = target_K_.cy;
+    }
+
     /**
      * @brief 初始化像素去畸变器
      * @details
@@ -497,6 +505,8 @@ public:
     };
 
     Undistorter(PixelUndistorter::Config::SharedPtr pixel_config, PhotoUndistorter::Config::SharedPtr photo_config, Config::SharedPtr config);
+
+    void GetTargetK(float &fx, float &fy, float &cx, float &cy) { pixel_undistorter_->GetTargetK(fx, fy, cx, cy); }
 
     /**
      * @brief 去畸变器核心去畸变函数

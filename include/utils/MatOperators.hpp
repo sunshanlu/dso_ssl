@@ -66,7 +66,7 @@ cv::Mat MatOperatorCorr(const cv::Mat &src1, const cv::Mat &src2)
     std::iota(indices.begin(), indices.end(), 0);
     std::vector<cv::Mat> dst_channels(indices.size());
 
-    std::for_each(std::execution::par_unseq, indices.begin(), indices.end(),
+    std::for_each(std::execution::par, indices.begin(), indices.end(),
                   [&](const int &i) { dst_channels[i] = MatOperatorCorrOne(src1_channels[i], src2_channels[i], Operator); });
 
     cv::Mat dst;

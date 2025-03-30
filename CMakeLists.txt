@@ -33,11 +33,11 @@ endif()
 file(GLOB_RECURSE SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cc)
 add_library(dso-ssl SHARED ${SRC_FILES})
 target_link_libraries(dso-ssl PUBLIC ${OpenCV_LIBS} ${PCL_LIBRARIES} Eigen3::Eigen TBB::tbb
-                                     yaml-cpp tabulate::tabulate g2o::core g2o::solver_eigen)
+                                     yaml-cpp tabulate::tabulate g2o::core g2o::solver_eigen g2o::solver_cholmod g2o::solver_csparse)
 target_include_directories(
     dso-ssl
     PUBLIC ${OpenCV_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS}
            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
            $<INSTALL_INTERFACE:include>)
 
-message(STATUS ${SRC_FILES})
+# message(STATUS ${SRC_FILES})

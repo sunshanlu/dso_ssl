@@ -19,26 +19,30 @@ namespace interp
  */
 float BilinInterp(const cv::Mat &data, float u, float v)
 {
-    assert(data.type() == CV_32F && "input data mast be CV_32F");
+  assert(data.type() == CV_32F && "input data mast be CV_32F");
 
-    int ix = static_cast<int>(u);
-    int iy = static_cast<int>(v);
+  int ix = static_cast<int>(u);
+  int iy = static_cast<int>(v);
 
-    if (ix < 0 || iy < 0 || ix >= data.cols - 1 || iy >= data.rows - 1)
-        throw std::out_of_range("coordinate out of range");
+  if (ix < 0 || iy < 0 || ix >= data.cols - 1 || iy >= data.rows - 1)
+  {
+    // todo 这里做了尝试
+    std::cout << ix << " " << iy << std::endl;
+    throw std::out_of_range("ix or iy out of range in BilinInterp");
+  }
 
-    float dx = u - ix;
-    float dy = v - iy;
+  float dx = u - ix;
+  float dy = v - iy;
 
-    const float &Ip0 = data.at<float>(iy + 1, ix + 1);
-    const float &Ip1 = data.at<float>(iy, ix + 1);
-    const float &Ip2 = data.at<float>(iy, ix);
-    const float &Ip3 = data.at<float>(iy + 1, ix);
+  const float &Ip0 = data.at<float>(iy + 1, ix + 1);
+  const float &Ip1 = data.at<float>(iy, ix + 1);
+  const float &Ip2 = data.at<float>(iy, ix);
+  const float &Ip3 = data.at<float>(iy + 1, ix);
 
-    float Ipl = Ip2 * (1 - dy) + Ip3 * dy;
-    float Ipr = Ip1 * (1 - dy) + Ip0 * dy;
+  float Ipl = Ip2 * (1 - dy) + Ip3 * dy;
+  float Ipr = Ip1 * (1 - dy) + Ip0 * dy;
 
-    return Ipl * (1 - dx) + Ipr * dx;
+  return Ipl * (1 - dx) + Ipr * dx;
 }
 
 /**
@@ -54,43 +58,43 @@ float BilinInterp(const cv::Mat &data, float u, float v)
  */
 cv::Mat BilinInterpCVMat(const cv::Mat &data, const cv::Mat &u, const cv::Mat &v)
 {
-    assert(data.type() == CV_32F && "input data mast be CV_32F");
-    assert(u.type() == CV_32F && v.type() == CV_32F && "input u and v mast be CV_32F");
-    assert(u.rows == v.rows && u.cols == v.cols && "input u and v must have same size");
-    cv::Mat result(u.rows, u.cols, CV_32F);
+  assert(data.type() == CV_32F && "input data mast be CV_32F");
+  assert(u.type() == CV_32F && v.type() == CV_32F && "input u and v mast be CV_32F");
+  assert(u.rows == v.rows && u.cols == v.cols && "input u and v must have same size");
+  cv::Mat result(u.rows, u.cols, CV_32F);
 
-    int allpixels = u.rows * u.cols;
+  int allpixels = u.rows * u.cols;
 
-    auto process_simd = [&](const int &start)
+  auto process_simd = [&](const int &start)
+  {
+    float ut[4], vt[4];
+    int rowt[4], colt[4];
+
+    for (int idx = start; idx < start + 4; ++idx)
     {
-        float ut[4], vt[4];
-        int rowt[4], colt[4];
+      int row = idx / u.cols;
+      int col = idx % u.cols;
+      ut[idx - start] = u.at<float>(row, col);
+      vt[idx - start] = v.at<float>(row, col);
+      rowt[idx - start] = row;
+      colt[idx - start] = col;
+    }
+    auto res = BilinInterpSSE(data, ut, vt);
+    for (int i = 0; i < 4; ++i)
+      result.at<float>(rowt[i], colt[i]) = res[i];
+  };
 
-        for (int idx = start; idx < start + 4; ++idx)
-        {
-            int row = idx / u.cols;
-            int col = idx % u.cols;
-            ut[idx - start] = u.at<float>(row, col);
-            vt[idx - start] = v.at<float>(row, col);
-            rowt[idx - start] = row;
-            colt[idx - start] = col;
-        }
-        auto res = BilinInterpSSE(data, ut, vt);
-        for (int i = 0; i < 4; ++i)
-            result.at<float>(rowt[i], colt[i]) = res[i];
-    };
+  auto process_single = [&](const int &idx)
+  {
+    int row = idx / u.cols;
+    int col = idx % u.cols;
 
-    auto process_single = [&](const int &idx)
-    {
-        int row = idx / u.cols;
-        int col = idx % u.cols;
+    result.at<float>(row, col) = BilinInterp(data, u.at<float>(row, col), v.at<float>(row, col));
+  };
 
-        result.at<float>(row, col) = BilinInterp(data, u.at<float>(row, col), v.at<float>(row, col));
-    };
+  // 并行化执行函数
+  parallel::ParallelWrapper(0, allpixels, 4, process_simd, process_single);
 
-    // 并行化执行函数
-    parallel::ParallelWrapper(0, allpixels, 4, process_simd, process_single);
-
-    return result;
+  return result;
 }
 } // namespace interp

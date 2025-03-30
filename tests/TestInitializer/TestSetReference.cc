@@ -60,7 +60,7 @@ void DrawCorrespondences(cv::Mat &image, const cv::Point2f &point1, const std::v
 }
 
 /// 展示参考帧
-void ShowReferenceFrame(const std::vector<Initializer::LayerFrame::SharedPtr> &layer_frames)
+void ShowReferenceFrame(const std::vector<LayerFrame::SharedPtr> &layer_frames)
 {
     for (int layer = 0; layer < layer_frames.size() - 1; ++layer)
     {
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
 
     // 构造初始化器
     Pattern::SharedPtr pattern = std::make_shared<Pattern>(8);
-    Initializer::SharedPtr initializer = std::make_shared<Initializer>(init_config, pixel_selector, pattern);
+    Initializer::SharedPtr initializer = std::make_shared<Initializer>(init_config, pixel_selector, pattern, 0, 0, 0, 0);
     initializer->SetReferenceFrame(frame);
 
     ShowReferenceFrame(initializer->GetRefLayerInfo());
