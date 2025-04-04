@@ -1,14 +1,19 @@
 /**
- * 测试 层级优化器的 LayerOptimizer::Optimize() 函数的效果
+ * 1. 初始化器的设置 reference frame 参考关键帧
+ * 2. 针对单个层级优化的方法测试
+ * 3. 针对某个关键帧优化的方法测试
+ * 4. 初始化器的整体流程测试，包含初始化器的可视化问题
  */
 
 #include <execution>
+#include <fstream>
+#include <iostream>
 #include <random>
 #include <vector>
 
 #include <opencv2/opencv.hpp>
 
-#include "dso/Initializer.hpp"
+#include "dso/Initializer2.hpp"
 #include "utils/TimerWrapper.hpp"
 
 using namespace dso_ssl;
@@ -37,14 +42,6 @@ void NormFilePath()
   SELECT_CONFIG_PATH = std::filesystem::absolute(SELECT_CONFIG_PATH).lexically_normal();
   INIT_CONFIG_PATH = std::filesystem::absolute(INIT_CONFIG_PATH).lexically_normal();
   STAMP_AND_EXPOSURE_PATH = std::filesystem::absolute(STAMP_AND_EXPOSURE_PATH).lexically_normal();
-
-  // std::cout << "TEST_IMG_PATH: " << TEST_IMG_PATH << std::endl;
-  // std::cout << "PHOTO_CONFIG_PATH: " << PHOTO_CONFIG_PATH << std::endl;
-  // std::cout << "PIXEL_CONFIG_PATH: " << PIXEL_CONFIG_PATH << std::endl;
-  // std::cout << "UNDIS_CONFIG_PATH: " << UNDIS_CONFIG_PATH << std::endl;
-  // std::cout << "FRAME_CONFIG_PATH: " << FRAME_CONFIG_PATH << std::endl;
-  // std::cout << "SELECT_CONFIG_PATH: " << SELECT_CONFIG_PATH << std::endl;
-  // std::cout << "INIT_CONFIG_PATH: " << INIT_CONFIG_PATH << std::endl;
 }
 
 void GetTimestampAndExposure(const std::string &time_path, std::vector<double> &timestamps, std::vector<float> &exposure_times)
@@ -64,58 +61,50 @@ void GetTimestampAndExposure(const std::string &time_path, std::vector<double> &
 int main(int argc, char **argv)
 {
   NormFilePath();
-  timer::TimerWrapper timer_wrapper("Initializer Test");
+  timer::TimerWrapper timer_wrapper("Initializer2 SetReference Test");
 
   PhotoUndistorter::Options::SharedPtr photo_config = std::make_shared<PhotoUndistorter::Options>(PHOTO_CONFIG_PATH);
   PixelUndistorter::Options::SharedPtr pixel_config = std::make_shared<PixelUndistorter::FOVConfig>(PIXEL_CONFIG_PATH);
   Undistorter::Options::SharedPtr undis_config = std::make_shared<Undistorter::Options>(UNDIS_CONFIG_PATH);
   Frame::Options::SharedPtr frame_config = std::make_shared<Frame::Options>(FRAME_CONFIG_PATH);
   PixelSelector::Options::SharedPtr select_config = std::make_shared<PixelSelector::Options>(SELECT_CONFIG_PATH);
-  Initializer::Options::SharedPtr init_config = std::make_shared<Initializer::Options>(INIT_CONFIG_PATH);
+  Initializer2::Options::SharedPtr init_config = std::make_shared<Initializer2::Options>(INIT_CONFIG_PATH);
 
   Undistorter::SharedPtr undistorter = std::make_shared<Undistorter>(pixel_config, photo_config, undis_config);
   PixelSelector::SharedPtr pixel_selector = std::make_shared<PixelSelector>(select_config);
+  Pattern::SharedPtr pattern = std::make_shared<Pattern>(8);
+
+  // 构造初始化器
+  float fx, fy, cx, cy;
+  undistorter->GetTargetK(fx, fy, cx, cy);
+  Initializer2::SharedPtr initializer2 = std::make_shared<Initializer2>(init_config, pixel_selector, pattern, fx, fy, cx, cy);
 
   std::vector<double> timestamps;
   std::vector<float> exposure_times;
   GetTimestampAndExposure(STAMP_AND_EXPOSURE_PATH, timestamps, exposure_times);
 
-  // 构造初始化器
-  float fx, fy, cx, cy;
-  undistorter->GetTargetK(fx, fy, cx, cy);
-  Pattern::SharedPtr pattern = std::make_shared<Pattern>(8);
-  Initializer::SharedPtr initializer = std::make_shared<Initializer>(init_config, pixel_selector, pattern, fx, fy, cx, cy);
-
-  cv::Mat distorted_image;
-  cv::Mat only_pixel_undistorted_image, undistorted_image;
-  double timestamp;
-  float exposure_time;
-
-  auto Undistort = [&]() -> cv::Mat { return undistorter->Undistort(distorted_image, only_pixel_undistorted_image); };
-  auto FrameConstruct = [&]() -> Frame::SharedPtr
+  for (int idx = 0; idx < 17; ++idx)
   {
-    auto frame = std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image, timestamp, exposure_time);
-    return frame;
-  };
+    cv::Mat distorted_image = cv::imread(TEST_IMG_PATH[idx], cv::IMREAD_GRAYSCALE);
+    cv::Mat only_pixel_undistorted_image;
+    cv::Mat undistorted_image = undistorter->Undistort(distorted_image, only_pixel_undistorted_image);
 
-  auto AddActivateFrame = [&](Frame::SharedPtr frame) -> bool { return initializer->AddActivateFrame(frame); };
+    Frame::SharedPtr frame = std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image, timestamps[idx], exposure_times[idx]);
 
-  // 执行初始化器的初始化过程
-  // int indices[] = {0, 3, 6, 10, 15, 16};
-  int indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-  for (auto &idx : indices)
-  {
-    timestamp = timestamps[idx];
-    exposure_time = exposure_times[idx];
-    distorted_image = cv::imread(TEST_IMG_PATH[idx], cv::IMREAD_GRAYSCALE);
-    undistorted_image = timer_wrapper.ExecuteAndMeasure("Undistorter::Distort", Undistort);
-    Frame::SharedPtr frame = timer_wrapper.ExecuteAndMeasure("Frame Constructor", FrameConstruct);
+    if (idx == 0)
+    {
+      initializer2->SetReference(frame);
+      continue;
+    }
 
-    bool initialized = timer_wrapper.ExecuteAndMeasure("Initializer::AddActivateFrame", AddActivateFrame, frame);
+    std::cout << "=========================================" << std::endl;
+    std::cout << frame->GetIdx() << std::endl;
+    std::cout << "=========================================" << std::endl;
+
+    auto ret = initializer2->TrackActivateFrame(frame);
+    if (ret)
+      break;
   }
-
-  timer_wrapper.TimerShow();
-  cv::destroyAllWindows();
 
   return 0;
 }

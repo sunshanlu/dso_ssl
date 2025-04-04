@@ -314,12 +314,12 @@ std::vector<PixelUndistorter::Grid> PixelUndistorter::CreateMeshgrid()
  * 并检查文件是否存在。如果文件不存在，将抛出一个运行时错误。接着，使用YAML库加载配置文件内容，并从中
  * 提取配置信息。根据配置信息中的标志决定是否加载特定的功能参数。
  */
-PhotoUndistorter::Config::Config(std::string file_path)
+PhotoUndistorter::Options::Options(std::string file_path)
 {
     // 获取配置文件的绝对路径
     auto abs_config_path = std::filesystem::absolute(std::filesystem::path(file_path)).lexically_normal();
     if (!std::filesystem::exists(abs_config_path))
-        throw std::runtime_error("Config file not found");
+        throw std::runtime_error("Options file not found");
 
     auto info = YAML::LoadFile(abs_config_path);
 
@@ -365,7 +365,7 @@ PhotoUndistorter::Config::Config(std::string file_path)
  *
  * @param ginv_params_path 包含GInv函数参数的文件路径
  */
-void PhotoUndistorter::Config::LoadGInvFunParams(const std::string &ginv_params_path)
+void PhotoUndistorter::Options::LoadGInvFunParams(const std::string &ginv_params_path)
 {
     std::ifstream ginv_params_file(ginv_params_path);
     float ginv_param = 0.f;
@@ -496,7 +496,7 @@ cv::Mat PhotoUndistorter::GinvUndistortOne(const cv::Mat &distorted_img)
  *
  * 在区间[0,255]之间分布
  */
-void PhotoUndistorter::Config::NormalizeGInv()
+void PhotoUndistorter::Options::NormalizeGInv()
 {
     std::vector<float> temp(256, 0);
     float factor = 255.f / (gfunc_inv_[255] - gfunc_inv_[0]);
@@ -540,7 +540,7 @@ void PhotoUndistorter::Config::NormalizeGInv()
  *
  * 在区间[0,255]之间分布
  */
-void PhotoUndistorter::Config::NormalizeGInvParallel()
+void PhotoUndistorter::Options::NormalizeGInvParallel()
 {
     std::vector<float> temp(256, 0);
     float factor = 255.f / (gfunc_inv_[255] - gfunc_inv_[0]);
@@ -578,7 +578,7 @@ void PhotoUndistorter::Config::NormalizeGInvParallel()
  *
  * 在区间[0, 1]之间分布
  */
-void PhotoUndistorter::Config::NormalizeVignette()
+void PhotoUndistorter::Options::NormalizeVignette()
 {
     double max_value, min_value;
 
@@ -594,7 +594,7 @@ void PhotoUndistorter::Config::NormalizeVignette()
  * @brief 根据Ginv 计算 G 函数
  *
  */
-void PhotoUndistorter::Config::ComputeGFunction()
+void PhotoUndistorter::Options::ComputeGFunction()
 {
     gfunc_ = std::vector<float>(256, 0);
     gfunc_[255] = 255;
@@ -615,7 +615,7 @@ void PhotoUndistorter::Config::ComputeGFunction()
  * @param Ivalue 输入的I'v(x)
  * @return float 输出的 dG / d(I'v)
  */
-float PhotoUndistorter::Config::ComputeGJacobian(float Ivalue)
+float PhotoUndistorter::Options::ComputeGJacobian(float Ivalue)
 {
     int idx = Ivalue + 0.5;
 
@@ -634,7 +634,7 @@ float PhotoUndistorter::Config::ComputeGJacobian(float Ivalue)
  * @param pixel_config 像素去畸变器配置
  * @param photo_config 光度去畸变器配置
  */
-Undistorter::Undistorter(PixelUndistorter::Config::SharedPtr pixel_config, PhotoUndistorter::Config::SharedPtr photo_config, Config::SharedPtr config)
+Undistorter::Undistorter(PixelUndistorter::Options::SharedPtr pixel_config, PhotoUndistorter::Options::SharedPtr photo_config, Options::SharedPtr config)
     : config_(std::move(config))
 {
     pixel_undistorter_ = std::make_shared<PixelUndistorter>(pixel_config);

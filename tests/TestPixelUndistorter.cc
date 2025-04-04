@@ -10,7 +10,7 @@ int main()
 {
     timer::TimerWrapper timer_wrapper("Undistorter Test");
 
-    PixelUndistorter::Config::SharedPtr config = std::make_shared<PixelUndistorter::FOVConfig>(CONFIG_PATH);
+    PixelUndistorter::Options::SharedPtr config = std::make_shared<PixelUndistorter::FOVConfig>(CONFIG_PATH);
     PixelUndistorter::SharedPtr undistorter = std::make_shared<PixelUndistorter>(config);
 
     cv::Mat distorted_image = cv::imread(TEST_IMG_PATH, cv::IMREAD_GRAYSCALE);

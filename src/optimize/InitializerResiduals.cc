@@ -54,8 +54,8 @@ void InitializerPhotoResidual::computeError()
   // 当计算第二次时，代表lm方法第一次调用computeError，直接跳过，防止冗余调用
   ++compute_times_;
 
-  if (compute_times_ == 2)
-    return;
+  // if (compute_times_ == 2)
+  //   return;
 
   Eigen::VectorXd error_temp(_error);
   is_outlier_ = false;

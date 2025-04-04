@@ -44,14 +44,14 @@ public:
     };
 
     /// 像素去畸变的配置信息
-    struct Config
+    struct Options
     {
-        using SharedPtr = std::shared_ptr<Config>;
+        using SharedPtr = std::shared_ptr<Options>;
         using DistortionT = undistort::DistortionT;
         using DistortedParams = undistort::DistortedParams;
 
         /// 基于yaml的构造函数
-        Config(const std::string &yaml_path)
+        Options(const std::string &yaml_path)
         {
             info_ = std::make_shared<YAML::Node>(YAML::LoadFile(yaml_path));
 
@@ -87,7 +87,7 @@ public:
             distorted_params_->LoadParams(distorted_params);
         }
 
-        virtual ~Config() = default;
+        virtual ~Options() = default;
 
         Eigen::Vector2i target_size_;                 ///< 指定虚拟的图像尺寸（w, h）
         Eigen::Vector2i source_size_;                 ///< 实际输入的图像尺寸（w, h）
@@ -99,10 +99,10 @@ public:
     };
 
     /// Pinhole 无畸变配置信息
-    struct PHConfig : public Config
+    struct PHConfig : public Options
     {
         PHConfig(const std::string &yaml_path)
-            : Config(yaml_path)
+            : Options(yaml_path)
         {
             LoadCameraInfo(*info_);
             info_ = nullptr;
@@ -115,15 +115,15 @@ public:
             distorted_type_ = undistort::DistortionT::Pinhole;
             distorted_params_ = std::make_shared<undistort::PinholeParams>();
 
-            Config::LoadDistortedParams(info);
+            Options::LoadDistortedParams(info);
         }
     };
 
     /// RadTan 3参数畸变模型配置
-    struct RT3Config : public Config
+    struct RT3Config : public Options
     {
         RT3Config(const std::string &yaml_path)
-            : Config(yaml_path)
+            : Options(yaml_path)
         {
             LoadCameraInfo(*info_);
             info_ = nullptr;
@@ -136,15 +136,15 @@ public:
             distorted_type_ = undistort::DistortionT::RadTan3;
             distorted_params_ = std::make_shared<undistort::RadTanParams<3>>();
 
-            Config::LoadDistortedParams(info);
+            Options::LoadDistortedParams(info);
         }
     };
 
     /// RadTan 5参数畸变模型配置
-    struct RT5Config : public Config
+    struct RT5Config : public Options
     {
         RT5Config(const std::string &yaml_path)
-            : Config(yaml_path)
+            : Options(yaml_path)
         {
             LoadCameraInfo(*info_);
             info_ = nullptr;
@@ -157,15 +157,15 @@ public:
             distorted_type_ = undistort::DistortionT::RadTan5;
             distorted_params_ = std::make_shared<undistort::RadTanParams<5>>();
 
-            Config::LoadDistortedParams(info);
+            Options::LoadDistortedParams(info);
         }
     };
 
     /// FOV 畸变模型配置
-    struct FOVConfig : public Config
+    struct FOVConfig : public Options
     {
         FOVConfig(const std::string &yaml_path)
-            : Config(yaml_path)
+            : Options(yaml_path)
         {
             LoadCameraInfo(*info_);
             info_ = nullptr;
@@ -178,15 +178,15 @@ public:
             distorted_type_ = undistort::DistortionT::FOV;
             distorted_params_ = std::make_shared<undistort::FOVParams>();
 
-            Config::LoadDistortedParams(info);
+            Options::LoadDistortedParams(info);
         }
     };
 
     /// KB 畸变模型配置
-    struct KBConfig : public Config
+    struct KBConfig : public Options
     {
         KBConfig(const std::string &yaml_path)
-            : Config(yaml_path)
+            : Options(yaml_path)
         {
             LoadCameraInfo(*info_);
             info_ = nullptr;
@@ -199,11 +199,11 @@ public:
             distorted_type_ = undistort::DistortionT::KB;
             distorted_params_ = std::make_shared<undistort::KBParams>();
 
-            Config::LoadDistortedParams(info);
+            Options::LoadDistortedParams(info);
         }
     };
 
-    PixelUndistorter(Config::SharedPtr config)
+    PixelUndistorter(Options::SharedPtr config)
         : config_(std::move(config))
     {
         assert(config_ && "config_ is nullptr");
@@ -331,7 +331,7 @@ private:
     /// 在无畸变归一化坐标系上，找到2 * 10001个点
     std::vector<Grid> CreateMeshgrid();
 
-    Config::SharedPtr config_; ///< 像素去畸变的配置信息
+    Options::SharedPtr config_; ///< 像素去畸变的配置信息
     bool is_inited_;           ///< 是否完成了初始化
     K target_K_;               ///< 无畸变图像的相机内参
     cv::Mat remap_x_;          ///< 无畸变图像坐标存储的畸变图像x映射
@@ -344,9 +344,9 @@ public:
     using SharedPtr = std::shared_ptr<PhotoUndistorter>;
 
     /// 光度去畸变器的配置
-    struct Config
+    struct Options
     {
-        using SharedPtr = std::shared_ptr<Config>;
+        using SharedPtr = std::shared_ptr<Options>;
 
         /**
          * @brief 根据输入的file_path构造光度去畸变器的配置
@@ -359,7 +359,7 @@ public:
          * 并检查文件是否存在。如果文件不存在，将抛出一个运行时错误。接着，使用YAML库加载配置文件内容，并从中
          * 提取配置信息。根据配置信息中的标志决定是否加载特定的功能参数。
          */
-        Config(std::string file_path);
+        Options(std::string file_path);
 
         /**
          * 加载GInv函数的参数
@@ -415,7 +415,7 @@ public:
         bool gfunc_inv_flag_;          ///< 是否使用非线性响应函数G^-1
     };
 
-    PhotoUndistorter(Config::SharedPtr config)
+    PhotoUndistorter(Options::SharedPtr config)
         : config_(std::move(config))
     {
     }
@@ -483,7 +483,7 @@ private:
      */
     cv::Mat GinvUndistortOne(const cv::Mat &distorted_img);
 
-    Config::SharedPtr config_; ///< 光度去畸变器配置
+    Options::SharedPtr config_; ///< 光度去畸变器配置
 };
 
 class Undistorter
@@ -491,11 +491,11 @@ class Undistorter
 public:
     using SharedPtr = std::shared_ptr<Undistorter>;
 
-    struct Config
+    struct Options
     {
-        using SharedPtr = std::shared_ptr<Config>;
+        using SharedPtr = std::shared_ptr<Options>;
 
-        Config(const std::string &file_path)
+        Options(const std::string &file_path)
         {
             auto info = YAML::LoadFile(file_path);
             use_origin_grad_ = info["UseDistortedGrad"].as<bool>();
@@ -504,7 +504,7 @@ public:
         bool use_origin_grad_;
     };
 
-    Undistorter(PixelUndistorter::Config::SharedPtr pixel_config, PhotoUndistorter::Config::SharedPtr photo_config, Config::SharedPtr config);
+    Undistorter(PixelUndistorter::Options::SharedPtr pixel_config, PhotoUndistorter::Options::SharedPtr photo_config, Options::SharedPtr config);
 
     void GetTargetK(float &fx, float &fy, float &cx, float &cy) { pixel_undistorter_->GetTargetK(fx, fy, cx, cy); }
 
@@ -521,7 +521,7 @@ public:
     cv::Mat Undistort(const cv::Mat &distorted_image, cv::Mat &pixel_undistorted_image);
 
 private:
-    Config::SharedPtr config_;
+    Options::SharedPtr config_;
     PixelUndistorter::SharedPtr pixel_undistorter_;
     PhotoUndistorter::SharedPtr photo_undistorter_;
 };

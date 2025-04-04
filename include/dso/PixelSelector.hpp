@@ -17,12 +17,12 @@ public:
     using SharedPtr = std::shared_ptr<PixelSelector>;
     using Vector2iArray = std::vector<Eigen::Vector2i, Eigen::aligned_allocator<Eigen::Vector2i>>;
 
-    struct Config
+    struct Options
     {
-        using SharedPtr = std::shared_ptr<Config>;
+        using SharedPtr = std::shared_ptr<Options>;
 
         /// 读取yaml文件的构造函数
-        Config(std::string file_path);
+        Options(std::string file_path);
 
         int first_layer_init_pot_;       ///< 第一层金字塔初始化的pot大小
         float down_sacle_factor_;        ///< 梯度阈值缩放比例
@@ -36,7 +36,7 @@ public:
         float other_layers_factor_th_;   ///< 其他层选点梯度阈值缩放比例
     };
 
-    PixelSelector(Config::SharedPtr config)
+    PixelSelector(Options::SharedPtr config)
         : config_(std::move(config))
     {
     }
@@ -61,7 +61,7 @@ public:
     void SelectOtherLayer(const int &numwant, const cv::Mat &image_and_grads, Vector2iArray &selected_points);
 
 private:
-    Config::SharedPtr config_;  ///< 点选配置
+    Options::SharedPtr config_;  ///< 点选配置
     cv::Mat grad_thresh_;       ///< 图像块梯度阈值
     int row_start_, col_start_; ///< 对grad_thresh_的补充
     int row_end_, col_end_;     ///< 对grad_thresh_的补充

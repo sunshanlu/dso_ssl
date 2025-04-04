@@ -53,7 +53,7 @@ void Frame::MakePyrdImages(const cv::Mat &first_layer_image)
  * @param first_layer_image             输入的图像金字塔第0层图像
  * @param only_pixel_undistorted_image  需要为点选做准备
  */
-Frame::Frame(const Config::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image, double timestamp,
+Frame::Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image, double timestamp,
              float exposure_time)
     : config_(config)
 {

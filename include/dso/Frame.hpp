@@ -42,11 +42,11 @@ public:
 
   friend void ShowPyraidImagesAndGrads(Frame::SharedPtr frameptr); // 展示图像金字塔，供测试使用
 
-  struct Config
+  struct Options
   {
-    using SharedPtr = std::shared_ptr<Config>;
+    using SharedPtr = std::shared_ptr<Options>;
 
-    Config(std::string file_path)
+    Options(std::string file_path)
     {
       auto info = YAML::LoadFile(file_path);
       pyra_levels_ = info["PyraidLevelsUsed"].as<int>();
@@ -57,13 +57,15 @@ public:
     bool use_origin_grad_; ///< 梯度平方和是否使用原图的梯度
   };
 
-  Frame(const Config::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image, double timestamp, float exposure_time);
+  Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image, double timestamp, float exposure_time);
 
   const std::vector<cv::Mat> &GetPyrdImageAndGrads() const { return pyrd_image_and_grads_; }
 
   const cv::Mat &GetSqureGrad() const { return squre_grad_; }
 
   const float &GetExposureTime() const { return frame_kernel_->exposure_time_; }
+
+  const std::size_t &GetIdx() const { return frame_kernel_->id_; }
 
 private:
   /// 构造图像金字塔 --> 4合1 + 均值滤波
@@ -72,7 +74,7 @@ private:
   /// 计算第0层梯度平方和，用于后续第0层的点选操作
   void MakeSqureGrad(const cv::Mat &only_pixel_undistorted_image);
 
-  Config::SharedPtr config_;                  ///< Frame的配置信息
+  Options::SharedPtr config_;                 ///< Frame的配置信息
   FrameKernel::SharedPtr frame_kernel_;       ///< 保存的帧核心参数信息
   std::vector<cv::Mat> pyrd_image_and_grads_; ///< 维护的图像金字塔上的图像和梯度信息
   cv::Mat image_and_grad_;                    ///< 金字塔第0层图像和梯度信息

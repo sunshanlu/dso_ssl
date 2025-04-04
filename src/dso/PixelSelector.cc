@@ -646,6 +646,7 @@ void PixelSelector::SelectOtherLayer(const int &numwant, const cv::Mat &image_an
         current_pot = desir_pot;
         current_factor_th = desir_factor_th;
         SelectOtherLayerInternal(current_pot, image_and_grads, selected_points, current_factor_th);
+        ++recu_depth;
     }
 
     int numhave = selected_points.size();
@@ -667,7 +668,7 @@ void PixelSelector::SelectOtherLayer(const int &numwant, const cv::Mat &image_an
  *
  * @param file_path 输入的配置yaml文件
  */
-PixelSelector::Config::Config(std::string file_path)
+PixelSelector::Options::Options(std::string file_path)
 {
     if (!std::filesystem::exists(file_path))
         throw std::runtime_error("配置文件不存在");

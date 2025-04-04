@@ -22,13 +22,13 @@ namespace project
 template <typename T>
 Eigen::Vector3<T> Pixel2Norm(const Eigen::Vector2<T> &pixel, const T &fx_inv, const T &fy_inv, const T &cx_inv, const T &cy_inv)
 {
-    Eigen::Vector3<T> norm;
-    norm << 1, 1, 1;
+  Eigen::Vector3<T> norm;
+  norm << 1, 1, 1;
 
-    norm[0] = pixel[0] * fx_inv - cx_inv;
-    norm[1] = pixel[1] * fy_inv - cy_inv;
+  norm[0] = pixel[0] * fx_inv - cx_inv;
+  norm[1] = pixel[1] * fy_inv - cy_inv;
 
-    return norm;
+  return norm;
 }
 
 /**
@@ -41,7 +41,7 @@ Eigen::Vector3<T> Pixel2Norm(const Eigen::Vector2<T> &pixel, const T &fx_inv, co
 template <typename T>
 Eigen::Vector3<T> Point2Norm(const Eigen::Matrix<T, 3, 1> &point)
 {
-    return point / point[2];
+  return point / point[2];
 }
 
 /**
@@ -58,12 +58,12 @@ Eigen::Vector3<T> Point2Norm(const Eigen::Matrix<T, 3, 1> &point)
 template <typename T>
 Eigen::Vector2<T> Norm2Pixel(const Eigen::Matrix<T, 3, 1> &norm, const T &fx, const T &fy, const T &cx, const T &cy)
 {
-    Eigen::Vector2<T> pixel;
+  Eigen::Vector2<T> pixel;
 
-    pixel[0] = norm[0] * fx + cx;
-    pixel[1] = norm[1] * fy + cy;
+  pixel[0] = norm[0] * fx + cx;
+  pixel[1] = norm[1] * fy + cy;
 
-    return pixel;
+  return pixel;
 }
 
 /**
@@ -83,18 +83,18 @@ template <typename T>
 void Pixel2Pixel(const Sophus::SE3<T> &Tji, const Eigen::Vector2<T> &pixel_in, const T &dpi, const T &fx, const T &fy, const T &cx, const T &cy,
                  Eigen::Vector3<T> &p, Eigen::Vector2<T> &pixel_out)
 {
-    if (fx == 0 || fy == 0)
-        throw std::runtime_error("fx == 0 || fy == 0");
+  if (fx == 0 || fy == 0)
+    throw std::runtime_error("fx == 0 || fy == 0");
 
-    T fx_inv = 1.0 / fx;
-    T fy_inv = 1.0 / fy;
-    T cx_inv = cx * fx_inv;
-    T cy_inv = cy * fy_inv;
+  T fx_inv = 1.0 / fx;
+  T fy_inv = 1.0 / fy;
+  T cx_inv = cx * fx_inv;
+  T cy_inv = cy * fy_inv;
 
-    Eigen::Vector3<T> pi_norm = Pixel2Norm(pixel_in, fx_inv, fy_inv, cx_inv, cy_inv);
-    p = Tji.so3() * pi_norm + Tji.translation() * dpi;
+  Eigen::Vector3<T> pi_norm = Pixel2Norm(pixel_in, fx_inv, fy_inv, cx_inv, cy_inv);
+  p = Tji.so3() * pi_norm + Tji.translation() * dpi;
 
-    pixel_out = Norm2Pixel(Point2Norm(p), fx, fy, cx, cy);
+  pixel_out = Norm2Pixel(Point2Norm(p), fx, fy, cx, cy);
 }
 
 /**
@@ -109,7 +109,7 @@ void Pixel2Pixel(const Sophus::SE3<T> &Tji, const Eigen::Vector2<T> &pixel_in, c
 template <typename T>
 Eigen::Vector3<T> Point2PointTemp(const Sophus::SE3<T> &Tji, const Eigen::Vector3<T> &pnorm_i, const T &dpi)
 {
-    return Tji.so3() * pnorm_i + Tji.translation() * dpi;
+  return Tji.so3() * pnorm_i + Tji.translation() * dpi;
 }
 
 using Vector3fArray = std::vector<Eigen::Vector3f, Eigen::aligned_allocator<Eigen::Vector3f>>;
@@ -134,7 +134,7 @@ void Point2PointTempSSEInternal(const Sophus::SE3f &Tji, const __m128 &x_norm_i_
 
 // clang-format off
 void Pixel2PixelSSE(const Sophus::SE3f &Tji, const Vector2fArray &pixel_in, const float &dpi, const float &fx, 
-                    const float &fy, const float &cx, const float &cy,Vector3fArray &p, Vector2fArray &pixel_out);
+                    const float &fy, const float &cx, const float &cy, Vector3fArray &p, Vector2fArray &pixel_out);
 // clang-format on
 
 } // namespace project

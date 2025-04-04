@@ -190,7 +190,7 @@ void Initializer::BuildParentChildRelation(LayerFrame::SharedPtr &cur_layer_fram
  *
  * @param config_path 输入的初始化器配置文件路径
  */
-Initializer::Config::Config(const std::string &config_path)
+Initializer::Options::Options(const std::string &config_path)
 {
   if (!std::filesystem::exists(config_path))
     throw std::runtime_error("配置文件不存在");
@@ -226,7 +226,7 @@ Initializer::Config::Config(const std::string &config_path)
  * @param ref_layer_frame 输入的参考帧上金字塔层上的信息
  */
 LayerOptimizer::LayerOptimizer(LayerFrame::SharedPtr ref_layer_frame, int nlevel, float fx, float fy, float cx, float cy, Pattern::SharedPtr pattern,
-                               const Initializer::Config::SharedPtr config)
+                               const Initializer::Options::SharedPtr config)
     : nlevel_(std::move(nlevel))
     , fx_(std::move(fx))
     , fy_(std::move(fy))
@@ -1045,7 +1045,7 @@ void Initializer::PropagateUp()
   }
 }
 
-Initializer::Initializer(Config::SharedPtr config, PixelSelector::SharedPtr pixel_selector, Pattern::SharedPtr pattern, float fx, float fy, float cx, float cy)
+Initializer::Initializer(Options::SharedPtr config, PixelSelector::SharedPtr pixel_selector, Pattern::SharedPtr pattern, float fx, float fy, float cx, float cy)
     : config_(std::move(config))
     , pattern_(std::move(pattern))
     , initialized_(false)
@@ -1108,6 +1108,7 @@ bool Initializer::AddActivateFrame(Frame::SharedPtr frame_ptr)
 
   bool meet_tji = Tji_estimate_.translation().norm() > config_->tji_threshold_;
   bool ok = Optimize(frame_ptr, Tji_estimate_, aji_estimate_, bji_estimate_, meet_tji);
+
   if (ok && meet_tji)
     ++continus_snap;
   else

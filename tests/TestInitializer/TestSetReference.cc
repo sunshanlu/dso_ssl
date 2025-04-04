@@ -186,12 +186,12 @@ int main(int argc, char **argv)
     NormFilePath();
     timer::TimerWrapper timer_wrapper("Initializer SetReference Test");
 
-    PhotoUndistorter::Config::SharedPtr photo_config = std::make_shared<PhotoUndistorter::Config>(PHOTO_CONFIG_PATH);
-    PixelUndistorter::Config::SharedPtr pixel_config = std::make_shared<PixelUndistorter::FOVConfig>(PIXEL_CONFIG_PATH);
-    Undistorter::Config::SharedPtr undis_config = std::make_shared<Undistorter::Config>(UNDIS_CONFIG_PATH);
-    Frame::Config::SharedPtr frame_config = std::make_shared<Frame::Config>(FRAME_CONFIG_PATH);
-    PixelSelector::Config::SharedPtr select_config = std::make_shared<PixelSelector::Config>(SELECT_CONFIG_PATH);
-    Initializer::Config::SharedPtr init_config = std::make_shared<Initializer::Config>(INIT_CONFIG_PATH);
+    PhotoUndistorter::Options::SharedPtr photo_config = std::make_shared<PhotoUndistorter::Options>(PHOTO_CONFIG_PATH);
+    PixelUndistorter::Options::SharedPtr pixel_config = std::make_shared<PixelUndistorter::FOVConfig>(PIXEL_CONFIG_PATH);
+    Undistorter::Options::SharedPtr undis_config = std::make_shared<Undistorter::Options>(UNDIS_CONFIG_PATH);
+    Frame::Options::SharedPtr frame_config = std::make_shared<Frame::Options>(FRAME_CONFIG_PATH);
+    PixelSelector::Options::SharedPtr select_config = std::make_shared<PixelSelector::Options>(SELECT_CONFIG_PATH);
+    Initializer::Options::SharedPtr init_config = std::make_shared<Initializer::Options>(INIT_CONFIG_PATH);
 
     Undistorter::SharedPtr undistorter = std::make_shared<Undistorter>(pixel_config, photo_config, undis_config);
     PixelSelector::SharedPtr pixel_selector = std::make_shared<PixelSelector>(select_config);
@@ -202,7 +202,7 @@ int main(int argc, char **argv)
     auto Undistort = [&]() -> cv::Mat { return undistorter->Undistort(distorted_image, only_pixel_undistorted_image); };
     auto FrameConstruct = [&]() -> Frame::SharedPtr
     {
-        auto frame = std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image);
+        auto frame = std::make_shared<Frame>(frame_config, undistorted_image, only_pixel_undistorted_image, 0, 0);
         return frame;
     };
 

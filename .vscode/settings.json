@@ -80,6 +80,7 @@
         "filesystem": "cpp",
         "execution": "cpp",
         "geometry": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "*.ipp": "cpp"
     }
 }

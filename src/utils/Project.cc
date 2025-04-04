@@ -41,7 +41,7 @@ void Norm2PixelSSEInternal(const __m128 &x_norm_sse, const __m128 &y_norm_sse, c
 
 /**
  * @brief 以SSE指令集类型为输入输出表示 3d坐标到归一化坐标
- * 
+ *
  * 注意这里的除零情况，会出现nan,导致整个程序崩溃
  *
  * @param x_data_sse 输入的 3d坐标x
@@ -262,13 +262,10 @@ void Pixel2PixelSSE(const Sophus::SE3f &Tji, const Vector2fArray &pixel_in, cons
   _mm_store_ps(result_vj, result_pixel_v_j);
   pixel_out = Vector2fArray(4);
 
-  // if (std::isnan(result_vj[0])){
-  //   std::cout << "this is nan here" << std::endl;
-  // }
-
   for (int idx = 0; idx < 4; ++idx)
     pixel_out[idx] = Eigen::Vector2f(result_uj[idx], result_vj[idx]);
 }
+
 
 /**
  * @brief 使用SSE加速，计算点到临时点的变换

@@ -25,11 +25,7 @@ float BilinInterp(const cv::Mat &data, float u, float v)
   int iy = static_cast<int>(v);
 
   if (ix < 0 || iy < 0 || ix >= data.cols - 1 || iy >= data.rows - 1)
-  {
-    // todo 这里做了尝试
-    std::cout << ix << " " << iy << std::endl;
     throw std::out_of_range("ix or iy out of range in BilinInterp");
-  }
 
   float dx = u - ix;
   float dy = v - iy;
@@ -43,6 +39,45 @@ float BilinInterp(const cv::Mat &data, float u, float v)
   float Ipr = Ip1 * (1 - dy) + Ip0 * dy;
 
   return Ipl * (1 - dx) + Ipr * dx;
+}
+
+/**
+ * @brief 对图像数据执行双线型差值，3 * 1，3通道
+ *
+ * @param data  输入的图像数据，要求为float类型
+ * @param u     输入的x坐标
+ * @param v     输入的y坐标
+ * @return float 输出的差值结果
+ */
+Eigen::Vector3f BilinInterp3(const cv::Mat &data, float u, float v)
+{
+  if (data.type() != CV_32FC3)
+    throw std::invalid_argument("input data must be CV_32FC3");
+
+  int ix = static_cast<int>(u);
+  int iy = static_cast<int>(v);
+
+  if (ix < 0 || iy < 0 || ix >= data.cols - 1 || iy >= data.rows - 1)
+    throw std::out_of_range("ix or iy out of range in BilinInterp");
+
+  float dx = u - ix;
+  float dy = v - iy;
+
+  Eigen::Vector3f result;
+  for (int idx = 0; idx < 3; ++idx)
+  {
+    const float &Ip0 = data.at<cv::Vec3f>(iy + 1, ix + 1)[idx];
+    const float &Ip1 = data.at<cv::Vec3f>(iy, ix + 1)[idx];
+    const float &Ip2 = data.at<cv::Vec3f>(iy, ix)[idx];
+    const float &Ip3 = data.at<cv::Vec3f>(iy + 1, ix)[idx];
+
+    float Ipl = Ip2 * (1 - dy) + Ip3 * dy;
+    float Ipr = Ip1 * (1 - dy) + Ip0 * dy;
+
+    result[idx] = Ipl * (1 - dx) + Ipr * dx;
+  }
+
+  return result;
 }
 
 /**

@@ -111,11 +111,11 @@ public:
   using SE3f = Sophus::SE3f;
   using LayerOptimizerPtr = std::shared_ptr<LayerOptimizer>;
 
-  struct Config
+  struct Options
   {
-    using SharedPtr = std::shared_ptr<Config>;
+    using SharedPtr = std::shared_ptr<Options>;
 
-    Config(const std::string &config_path);
+    Options(const std::string &config_path);
 
     int pyra_levels_;                     ///< 使用的图像金字塔层级
     int neighbor_nums_;                   ///< 邻居点的数量
@@ -133,7 +133,7 @@ public:
     float make_sense_ratio_;              ///< 优化比例，更新优化的比例占优化次数的比例
   };
 
-  Initializer(Config::SharedPtr config, PixelSelector::SharedPtr pixel_selector, Pattern::SharedPtr pattern, float fx, float fy, float cx, float cy);
+  Initializer(Options::SharedPtr config, PixelSelector::SharedPtr pixel_selector, Pattern::SharedPtr pattern, float fx, float fy, float cx, float cy);
 
   const std::vector<LayerFrame::SharedPtr> &GetRefLayerInfo() const { return ref_layer_info_; }
 
@@ -218,7 +218,7 @@ public:
   void OptimizationResultsShow(const int &make_sense_layer, std::ostream &stream = std::cout);
 
 private:
-  Config::SharedPtr config_;                        ///< 初始化器配置信息
+  Options::SharedPtr config_;                        ///< 初始化器配置信息
   std::vector<LayerOptimizerPtr> layer_optimizers_; ///< 层级优化器
   Pattern::SharedPtr pattern_;                      ///< 初始化器构建残差时，使用的pattern
   std::vector<float> fx_, fy_, cx_, cy_;            ///< 层级金字塔相机内参
@@ -262,7 +262,7 @@ public:
 
   /// 根据输入的ref layer frame信息，创建优化过程需要的所有vertex和edge
   LayerOptimizer(LayerFrame::SharedPtr ref_layer_frame, int nlevel, float fx, float fy, float cx, float cy, Pattern::SharedPtr pattern,
-                 const Initializer::Config::SharedPtr config);
+                 const Initializer::Options::SharedPtr config);
 
   /// 获取优化结果详情
   const OptimizeResultDetails &GetResultDetails() const { return result_details_; }

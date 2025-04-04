@@ -22,7 +22,7 @@ int main()
     NormFilePath();
     timer::TimerWrapper timer_wrapper("PhotoUndistorter Test");
 
-    PhotoUndistorter::Config::SharedPtr config = std::make_shared<PhotoUndistorter::Config>(CONFIG_PATH);
+    PhotoUndistorter::Options::SharedPtr config = std::make_shared<PhotoUndistorter::Options>(CONFIG_PATH);
     PhotoUndistorter::SharedPtr undistorter = std::make_shared<PhotoUndistorter>(config);
 
     cv::Mat distorted_image = cv::imread(TEST_IMG_PATH, cv::IMREAD_GRAYSCALE);

@@ -114,11 +114,11 @@ int main()
     NormFilePath();
     timer::TimerWrapper timer_wrapper("PixelSelector Test");
 
-    PhotoUndistorter::Config::SharedPtr photo_config = std::make_shared<PhotoUndistorter::Config>(PHOTO_CONFIG_PATH);
-    PixelUndistorter::Config::SharedPtr pixel_config = std::make_shared<PixelUndistorter::FOVConfig>(PIXEL_CONFIG_PATH);
-    Undistorter::Config::SharedPtr undis_config = std::make_shared<Undistorter::Config>(UNDIS_CONFIG_PATH);
-    Frame::Config::SharedPtr frame_config = std::make_shared<Frame::Config>(FRAME_CONFIG_PATH);
-    PixelSelector::Config::SharedPtr select_config = std::make_shared<PixelSelector::Config>(SELECT_CONFIG_PATH);
+    PhotoUndistorter::Options::SharedPtr photo_config = std::make_shared<PhotoUndistorter::Options>(PHOTO_CONFIG_PATH);
+    PixelUndistorter::Options::SharedPtr pixel_config = std::make_shared<PixelUndistorter::FOVConfig>(PIXEL_CONFIG_PATH);
+    Undistorter::Options::SharedPtr undis_config = std::make_shared<Undistorter::Options>(UNDIS_CONFIG_PATH);
+    Frame::Options::SharedPtr frame_config = std::make_shared<Frame::Options>(FRAME_CONFIG_PATH);
+    PixelSelector::Options::SharedPtr select_config = std::make_shared<PixelSelector::Options>(SELECT_CONFIG_PATH);
 
     Undistorter::SharedPtr undistorter = std::make_shared<Undistorter>(pixel_config, photo_config, undis_config);
     PixelSelector::SharedPtr pixel_selector = std::make_shared<PixelSelector>(select_config);
