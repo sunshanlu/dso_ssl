@@ -28,14 +28,14 @@ public:
    * 本函数用于执行给定的函数并测量其执行时间，同时记录函数名称和执行时间
    * 主要用于性能分析和调试目的
    *
-   * @tparam F 要执行的函数的类型
+   * @tparam F    要执行的函数的类型
    * @tparam Args 函数参数的类型
-   * @param name 函数的名称，用于在性能分析时标识函数
-   * @param func 要执行的函数对象
-   * @param args 函数的参数，使用完美转发保持原始类型
+   * @param name  函数的名称，用于在性能分析时标识函数
+   * @param func  要执行的函数对象
+   * @param args  函数的参数，使用完美转发保持原始类型
    * @return 执行函数的结果
    */
-  template <typename F, typename... Args>
+  template<typename F, typename... Args>
   auto ExecuteAndMeasure(const std::string &name, F &&func, Args &&...args)
   {
     auto duration = 999999ms;

@@ -1,0 +1,15 @@
+WorldCoordianteLength: 0.5
+CameraCoordianteLength: 0.1
+
+Trajectory:
+  Width: 0.1
+  PointSize: 0.15
+  Color: [1.0, 0.0, 0.0]
+
+Window:
+  Width: 1280
+  Height: 720
+
+ImageShower:
+  Width: 640
+  Height: 480

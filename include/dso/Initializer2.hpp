@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 
 #include <Eigen/Core>
@@ -11,6 +13,8 @@
 
 namespace dso_ssl
 {
+
+class Visualizer;
 
 /**
  * @brief 初始化中的逆深度点
@@ -77,6 +81,7 @@ class Initializer2
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+  using VisualizerPtr = std::shared_ptr<Visualizer>;
   using SharedPtr = std::shared_ptr<Initializer2>;
   using PointT = pcl::PointXY;
   using CloudT = pcl::PointCloud<PointT>;
@@ -265,8 +270,6 @@ public:
       auto &child_point = children_pixel_points[idx];
       auto &parent_point = parent_pixel_points[child_point->parent_id_];
 
-      //todo 为什么这里的id出现了问题？？
-
       // 认为在优化最后被判断为内点
       if (!parent_point->is_good_)
         return;
@@ -290,12 +293,8 @@ public:
     };
 
     // 这时仅仅使用parent 的内容，而不是修改，因此不存在数据竞争
-    // std::for_each(std::execution::par, indices.begin(), indices.end(), child_point_process);
-    // std::for_each(std::execution::par, indices.begin(), indices.end(), update_ir_process);
-
-    // todo 去掉多线程，方便调试
-    std::for_each(indices.begin(), indices.end(), child_point_process);
-    std::for_each(indices.begin(), indices.end(), update_ir_process);
+    std::for_each(std::execution::par, indices.begin(), indices.end(), child_point_process);
+    std::for_each(std::execution::par, indices.begin(), indices.end(), update_ir_process);
   }
 
   /**
@@ -497,6 +496,9 @@ public:
    */
   void BuildParentChildAss(const int &level, const KdTree2d::ConstPtr &prev_kdtree, const CloudT::ConstPtr &curr_cloud);
 
+  /// 设置可视化器
+  void SetVisualizer(VisualizerPtr visualizer);
+
 private:
   SE3f Tji_, Tji_new_;                  ///< 相对位姿变换
   float aji_, aji_new_, bji_, bji_new_; ///< aji和bji
@@ -509,6 +511,8 @@ private:
 
   std::vector<std::vector<InitIdepthPoint::SharedPtr>> init_idepth_points_; ///< 初始化过程中的逆深度点
   std::vector<float> init_fx_, init_fy_, init_cx_, init_cy_;                ///< 初始化过程中的相机内参
+
+  VisualizerPtr visualizer_; ///< 可视化器，用于初始化器的可视化
 };
 
 } // namespace dso_ssl

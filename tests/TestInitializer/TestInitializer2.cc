@@ -13,6 +13,7 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "dso/Visualizer.hpp"
 #include "dso/Initializer2.hpp"
 #include "utils/TimerWrapper.hpp"
 
@@ -29,6 +30,7 @@ std::string FRAME_CONFIG_PATH = "./tests/config/Frame.yaml";
 std::string INIT_CONFIG_PATH = "./tests/config/Initializer.yaml";
 std::string SELECT_CONFIG_PATH = "./tests/config/PixelSelector.yaml";
 std::string STAMP_AND_EXPOSURE_PATH = "./tests/res/times.txt";
+std::string VISUALIZER_CONFIG_PATH = "./tests/config/Visualizer.yaml";
 
 void NormFilePath()
 {
@@ -42,6 +44,7 @@ void NormFilePath()
   SELECT_CONFIG_PATH = std::filesystem::absolute(SELECT_CONFIG_PATH).lexically_normal();
   INIT_CONFIG_PATH = std::filesystem::absolute(INIT_CONFIG_PATH).lexically_normal();
   STAMP_AND_EXPOSURE_PATH = std::filesystem::absolute(STAMP_AND_EXPOSURE_PATH).lexically_normal();
+  VISUALIZER_CONFIG_PATH = std::filesystem::absolute(VISUALIZER_CONFIG_PATH).lexically_normal();
 }
 
 void GetTimestampAndExposure(const std::string &time_path, std::vector<double> &timestamps, std::vector<float> &exposure_times)
@@ -69,15 +72,19 @@ int main(int argc, char **argv)
   Frame::Options::SharedPtr frame_config = std::make_shared<Frame::Options>(FRAME_CONFIG_PATH);
   PixelSelector::Options::SharedPtr select_config = std::make_shared<PixelSelector::Options>(SELECT_CONFIG_PATH);
   Initializer2::Options::SharedPtr init_config = std::make_shared<Initializer2::Options>(INIT_CONFIG_PATH);
+  Visualizer::Options::SharedPtr visualizer_config = std::make_shared<Visualizer::Options>(VISUALIZER_CONFIG_PATH);
 
   Undistorter::SharedPtr undistorter = std::make_shared<Undistorter>(pixel_config, photo_config, undis_config);
   PixelSelector::SharedPtr pixel_selector = std::make_shared<PixelSelector>(select_config);
   Pattern::SharedPtr pattern = std::make_shared<Pattern>(8);
+  Visualizer::SharedPtr visualizer = std::make_shared<Visualizer>(visualizer_config);
+  visualizer->Run();
 
   // 构造初始化器
   float fx, fy, cx, cy;
   undistorter->GetTargetK(fx, fy, cx, cy);
   Initializer2::SharedPtr initializer2 = std::make_shared<Initializer2>(init_config, pixel_selector, pattern, fx, fy, cx, cy);
+  initializer2->SetVisualizer(visualizer);
 
   std::vector<double> timestamps;
   std::vector<float> exposure_times;
@@ -105,6 +112,8 @@ int main(int argc, char **argv)
     if (ret)
       break;
   }
+
+  visualizer->Join();
 
   return 0;
 }

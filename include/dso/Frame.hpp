@@ -46,7 +46,7 @@ public:
   {
     using SharedPtr = std::shared_ptr<Options>;
 
-    Options(std::string file_path)
+    Options(const std::string &file_path)
     {
       auto info = YAML::LoadFile(file_path);
       pyra_levels_ = info["PyraidLevelsUsed"].as<int>();

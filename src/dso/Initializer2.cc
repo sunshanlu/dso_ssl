@@ -1,4 +1,5 @@
 #include "dso/Initializer2.hpp"
+#include "dso/Visualizer.hpp"
 #include "utils/Interpolate.hpp"
 #include "utils/Project.hpp"
 
@@ -167,7 +168,7 @@ void Initializer2::BuildParentChildAss(const int &level, const KdTree2d::ConstPt
  * 3. 在某个帧来到后，首先应该判断snap条件，然后根据snap条件进行状态重置
  * 4. 从上到下进行逆深度点的初始化
  * 5. 从下到上进行逆深度点的修正
- * 
+ *
  * @note 当return true时，输入的frame帧还没有进行跟踪操作
  *
  * @param frame   输入的待跟踪的帧
@@ -347,8 +348,18 @@ bool Initializer2::TrackActivateFrame(Frame::SharedPtr frame)
   if (snap)
     PropagateUp();
 
+  if (visualizer_)
+  {
+    visualizer_->UpdateReferenceFrame(reference_frame_, init_idepth_points_[0]);
+    visualizer_->UpdateTrackingFrame(current_frame_);
+    visualizer_->UpdateInitializerCloud(init_idepth_points_[0], init_fx_[0], init_fy_[0], init_cx_[0], init_cy_[0]);
+  }
+
   return false;
 }
+
+/// 设置可视化器
+void Initializer2::SetVisualizer(VisualizerPtr visualizer) { visualizer_ = std::move(visualizer); }
 
 /**
  * @brief 计算能量、正规方程和schur边缘化后的正规方程
@@ -462,7 +473,7 @@ Initializer2::Vec4f Initializer2::ComputeJacobianAndError(const int &level, Mat8
       b_d += Jacobian * rk;
     }
 
-    if (!point_ref->is_good_ || point_ref->energy_new_ > options_->outlier_threshold_)
+    if (!point_ref->is_good_ || point_ref->energy_new_ > options_->outlier_threshold_ || point_ref->idepth_new_ < 1e-3)
     {
       point_ref->is_good_ = false;
       point_ref->energy_new_ = point_ref->energy_;

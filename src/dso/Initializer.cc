@@ -1030,13 +1030,9 @@ void Initializer::PropagateUp()
     indices_prev = std::vector<int>(pixel_points_prev.size(), 0);
     std::iota(indices_prev.begin(), indices_prev.end(), 0);
 
-    // std::for_each(std::execution::par, indices_prev.begin(), indices_prev.end(), compute_idepth_and_hessian_process);
-    // std::for_each(std::execution::par, indices_prev.begin(), indices_prev.end(), set_parent_idepth_process);
-    // std::for_each(std::execution::par, indices_prev.begin(), indices_prev.end(), update_ir_process);
-
-    std::for_each(indices_prev.begin(), indices_prev.end(), compute_idepth_and_hessian_process);
-    std::for_each(indices_prev.begin(), indices_prev.end(), set_parent_idepth_process);
-    std::for_each(indices_prev.begin(), indices_prev.end(), update_ir_process);
+    std::for_each(std::execution::par, indices_prev.begin(), indices_prev.end(), compute_idepth_and_hessian_process);
+    std::for_each(std::execution::par, indices_prev.begin(), indices_prev.end(), set_parent_idepth_process);
+    std::for_each(std::execution::par, indices_prev.begin(), indices_prev.end(), update_ir_process);
 
     std::swap(layer_frame_curr, layer_frame_prev);
     std::swap(pixel_points_curr, pixel_points_prev);

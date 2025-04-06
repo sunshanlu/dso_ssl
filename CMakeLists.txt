@@ -17,8 +17,7 @@ find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Sophus REQUIRED)
 find_package(TBB REQUIRED)
-find_package(Pangolin REQUIRED)
-find_package(SLAMViewer REQUIRED)
+find_package(slam_viewer REQUIRED)
 find_package(g2o REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(tabulate REQUIRED)
@@ -33,7 +32,8 @@ endif()
 file(GLOB_RECURSE SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cc)
 add_library(dso-ssl SHARED ${SRC_FILES})
 target_link_libraries(dso-ssl PUBLIC ${OpenCV_LIBS} ${PCL_LIBRARIES} Eigen3::Eigen TBB::tbb
-                                     yaml-cpp tabulate::tabulate g2o::core g2o::solver_eigen g2o::solver_cholmod g2o::solver_csparse)
+                                     yaml-cpp tabulate::tabulate g2o::core g2o::solver_eigen g2o::solver_cholmod g2o::solver_csparse
+                                     slam_viewer::slam_viewer)
 target_include_directories(
     dso-ssl
     PUBLIC ${OpenCV_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS}
