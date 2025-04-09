@@ -39,7 +39,7 @@ void Initializer::SetReferenceFrame(Frame::SharedPtr frame_ptr)
   for (int nlevel = 0; nlevel < config_->pyra_levels_; ++nlevel)
   {
     // 维护layer_frame的层级信息
-    LayerFrame::SharedPtr layer_frame = std::make_shared<LayerFrame>();
+    auto layer_frame = std::make_shared<LayerFrame>();
     layer_frame->nlevel_ = nlevel;
 
     // 维护layer_frame的图像和梯度信息

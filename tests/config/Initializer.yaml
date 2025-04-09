@@ -1,13 +1,13 @@
 # 初始化器
 PyraidLevelsUsed: 4       # 使用的图像金字塔的层级
 NeighborNum: 10           # 获取邻居点的数目
-SelectDensities:          # 图像金字塔的点选密度
+SelectDensities: # 图像金字塔的点选密度
   - 0.03
   - 0.05
   - 0.15
   - 0.7
 
-MaxIterations:            # 每层金字塔的迭代次数
+MaxIterations: # 每层金字塔的迭代次数
   - 5
   - 5
   - 10
@@ -23,3 +23,6 @@ AlphaW: 22500             # tji不满足条件时的 点逆深度正则化和 tj
 Alpha: 1                  # tji满足条件时的 点逆深度正则化权重
 TransjiThreshold: 0.006   # tji阈值
 MakeSenseRatio: 0.7       # 当某个层级的逆深度被优化次数 / 实际优化的次数 比例阈值
+RequirePointsNum: 2000    # 初始化完成后，关键帧0需要的逆深度点数
+ImmaturePointsNum: 1500   # 初始化完成后，关键帧1需要的未成熟点数
+

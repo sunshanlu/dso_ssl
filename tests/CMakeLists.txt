@@ -24,3 +24,4 @@ target_link_libraries(TestProject dso-ssl)
 target_include_directories(TestProject PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
 add_subdirectory(TestInitializer)
+add_subdirectory(TestTracker)

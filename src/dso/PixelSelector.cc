@@ -444,7 +444,7 @@ void PixelSelector::SelectFirstLayer(const int &numwant, const cv::Mat &image_gr
 
     int recursion_depth = 0;
     int allpixels = image_grad_squre.rows * image_grad_squre.cols;
-    int current_potsize = std::sqrt(allpixels / (float)numwant) - 1;
+    int current_potsize = std::sqrt(allpixels / static_cast<float>(numwant)) - 1;
 
     // 临界条件判断
     if (current_potsize < 1)
@@ -458,7 +458,7 @@ void PixelSelector::SelectFirstLayer(const int &numwant, const cv::Mat &image_gr
 
         SelectFirstLayerInternal(current_potsize, image_grad_squre, selected_points_conf, selected_points);
 
-        ratio = (float)numwant / selected_points.size();
+        ratio = static_cast<float>(numwant) / selected_points.size();
 
         if (ratio <= 1.25 && ratio >= 0.25)
             break;

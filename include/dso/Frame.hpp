@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 
 #include <opencv2/opencv.hpp>
 #include <sophus/se3.hpp>
@@ -57,7 +58,40 @@ public:
     bool use_origin_grad_; ///< 梯度平方和是否使用原图的梯度
   };
 
-  Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image, double timestamp, float exposure_time);
+  Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image,
+        double timestamp, float exposure_time);
+
+  Frame(Frame &&other) noexcept
+  {
+    options_ = std::move(other.options_);
+    frame_kernel_ = std::move(other.frame_kernel_);
+    pyrd_image_and_grads_ = std::move(other.pyrd_image_and_grads_);
+    image_and_grad_ = std::move(other.image_and_grad_);
+    squre_grad_ = std::move(other.squre_grad_);
+
+    other.options_ = nullptr;
+    other.frame_kernel_ = nullptr;
+    other.pyrd_image_and_grads_.clear();
+    other.image_and_grad_ = cv::Mat();
+    other.squre_grad_ = cv::Mat();
+  }
+
+  /**
+   * @brief 设置帧的状态，包括位姿和仿射参数
+   *
+   * @param Tcw 输入的估计的位姿Tcw
+   * @param acw 输入的估计的乘法仿射参数acw
+   * @param bcw 输入的估计的加法仿射参数bcw
+   */
+  void SetEstimate(const Sophus::SE3f &Tcw, const float &acw, const float &bcw)
+  {
+    std::lock_guard<std::mutex> lock(status_mutex_);
+    frame_kernel_->T_cw_ = Tcw;
+    frame_kernel_->affine_ab_.a_ = acw;
+    frame_kernel_->affine_ab_.b_ = bcw;
+  }
+
+  virtual ~Frame() = default;
 
   const std::vector<cv::Mat> &GetPyrdImageAndGrads() const { return pyrd_image_and_grads_; }
 
@@ -67,18 +101,25 @@ public:
 
   const std::size_t &GetIdx() const { return frame_kernel_->id_; }
 
-private:
+  Sophus::SE3f GetTcw()
+  {
+    std::lock_guard<std::mutex> lock(status_mutex_);
+    return frame_kernel_->T_cw_;
+  }
+
+protected:
   /// 构造图像金字塔 --> 4合1 + 均值滤波
   void MakePyrdImages(const cv::Mat &first_layer_image);
 
   /// 计算第0层梯度平方和，用于后续第0层的点选操作
   void MakeSqureGrad(const cv::Mat &only_pixel_undistorted_image);
 
-  Options::SharedPtr config_;                 ///< Frame的配置信息
+  Options::SharedPtr options_;                 ///< Frame的配置信息
   FrameKernel::SharedPtr frame_kernel_;       ///< 保存的帧核心参数信息
   std::vector<cv::Mat> pyrd_image_and_grads_; ///< 维护的图像金字塔上的图像和梯度信息
   cv::Mat image_and_grad_;                    ///< 金字塔第0层图像和梯度信息
   cv::Mat squre_grad_;                        ///< 梯度平方和
+  std::mutex status_mutex_;                   ///< 状态互斥量
 };
 
 } // namespace dso_ssl

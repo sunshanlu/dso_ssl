@@ -8,6 +8,7 @@
 #include <pcl/point_types.h>
 
 #include "dso/Frame.hpp"
+#include "dso/Keyframe.hpp"
 #include "dso/Pattern.hpp"
 #include "dso/PixelSelector.hpp"
 
@@ -39,9 +40,9 @@ struct InitIdepthPoint
       : iR_(1.0)
       , b_(0.0)
       , only_photo_hessian_(0.0)
+      , hessian_(0.0)
       , idepth_(1.0)
       , energy_(0.0)
-      , hessian_(0.0)
       , is_update_(false)
   {
     ResetOptimizeInfo();
@@ -76,6 +77,7 @@ struct InitIdepthPoint
   bool is_good_;                         ///< 在计算残差过程中，判断是否是good点
 };
 
+/// dso的初始化器
 class Initializer2
 {
 public:
@@ -118,12 +120,15 @@ public:
     float alpha_;                         ///< 平移足够时，正则化权重
     float tji_threshold_;                 ///< tji的阈值信息
     float make_sense_ratio_;              ///< 优化比例，更新优化的比例占优化次数的比例
+    int require_points_num_;              ///< 初始化过程中需要的初始化点的数量
+    int immature_points_num_;             ///< 需要多少未成熟点
   };
 
-  Initializer2(Options::SharedPtr options, PixelSelector::SharedPtr pixel_selector, Pattern::SharedPtr pattern, float fx, float fy, float cx, float cy)
+  Initializer2(Options::SharedPtr options, PixelSelector::SharedPtr pixel_selector, Pattern::SharedPtr pattern,
+               const float fx, const float fy, const float cx, const float cy)
       : options_(std::move(options))
-      , pixel_selector_(std::move(pixel_selector))
       , pattern_(std::move(pattern))
+      , pixel_selector_(std::move(pixel_selector))
       , init_idepth_points_(options_->pyra_levels_)
   {
     Tji_ = Tji_new_ = SE3f();
@@ -138,6 +143,18 @@ public:
       init_cx_.push_back(cx / down_scale);
       init_cy_.push_back(cy / down_scale);
     }
+  }
+
+  /**
+   * @brief 当初始化完成后，获取由初始化器构建的关键帧信息
+   *
+   * @param keyframe0 输出的参考关键帧，带有逆深度信息
+   * @param keyframe1 输出的最后跟踪的参考关键帧，带有未成熟点信息
+   */
+  void GetKeyFrames(KeyFrame::SharedPtr &keyframe0, KeyFrame::SharedPtr &keyframe1)
+  {
+    keyframe0 = keyframe0_;
+    keyframe1 = keyframe1_;
   }
 
   /**
@@ -156,6 +173,23 @@ public:
     bji_ = bji_new_ = bji;
   }
 
+  /**
+   * @brief 初始化器的后处理过程
+   *
+   * 1. 根据初始化器参考帧，构建关键帧0
+   * 2. 根据跟踪最后帧，构建关键帧1
+   * 3. 根据初始化器的优化点，构建关键帧0的地图点（逆深度，host为关键帧0）
+   * 4. 提取参考关键帧1的未成熟地图点，以便后续跟踪过程对未成熟点的更新
+   */
+  void PostProcess();
+
+  /**
+   * @brief 获取优化参数
+   *
+   * @param Tji 输出的Tji优化值
+   * @param aji 输出的aji优化值
+   * @param bji 输出的bji优化值
+   */
   void GetOptimizationParams(SE3f &Tji, float &aji, float &bji)
   {
     Tji = Tji_;
@@ -169,44 +203,11 @@ public:
    * 1. 更新Tji、aji、bji，直接使用inc即可
    * 2. 更新参考关键帧的逆深度信息
    *
-   * @param inc 输入的正规方程得到的增量信息
+   * @param lvl     输入的金字塔优化层级
+   * @param inc     输入的正规方程得到的增量信息
+   * @param lambda  输入的lambda值，考虑lm方法
    */
-  void ApplyStep(const int &lvl, const Vec8f &inc, const float &lambda)
-  {
-    // 状态保存，以便backup
-    Tji_ = Tji_new_;
-    aji_ = aji_new_;
-    bji_ = bji_new_;
-
-    // Tji、aji、bji的更新
-    Tji_new_ = Sophus::SE3f::exp(inc.head<6>()) * Tji_new_;
-    aji_new_ += inc[6];
-    bji_new_ += inc[7];
-
-    // idepth的更新
-    auto &lvl_idepth_points = init_idepth_points_[lvl];
-    for (auto &lvl_point : lvl_idepth_points)
-    {
-      if (!lvl_point->is_good_)
-        continue;
-
-      // 在applyStep时，做状态copy，以便backup
-      lvl_point->b_ = lvl_point->b_new_;
-      lvl_point->only_photo_hessian_ = lvl_point->only_photo_hessian_new_;
-      lvl_point->hessian_ = lvl_point->hessian_new_;
-      lvl_point->idepth_ = lvl_point->idepth_new_;
-      lvl_point->energy_ = lvl_point->energy_new_;
-      lvl_point->hessian_fd_ = lvl_point->hessian_fd_new_;
-
-      float bd = lvl_point->b_new_;
-      float Hdd = lvl_point->hessian_new_;
-
-      bd += lvl_point->hessian_fd_new_.cast<float>().dot(inc);
-      float delta_idepth = -bd / ((1 + lambda) * Hdd);
-      lvl_point->idepth_new_ += delta_idepth;
-      lvl_point->is_update_ = true;
-    }
-  }
+  void ApplyStep(const int &lvl, const Vec8f &inc, const float &lambda);
 
   /**
    * @brief 更新逆深度的期望值
@@ -218,29 +219,7 @@ public:
    * @param level       输入的待更新点所在的金字塔层级
    * @param make_sense  输入的与当前层所有像素点，是否有意义
    */
-  void UpdateIR(const int &idx, const int &level, const std::vector<bool> &make_sense)
-  {
-    std::vector<float> iRnn;
-    auto &level_points = init_idepth_points_[level];
-    auto &level_point = level_points[idx];
-
-    for (const auto &idx : level_point->neighbor_ids_)
-    {
-      if (!make_sense[idx])
-        continue;
-
-      iRnn.push_back(level_points[idx]->idepth_new_);
-    }
-
-    if (!iRnn.empty())
-    {
-      std::nth_element(iRnn.begin(), iRnn.begin() + iRnn.size() / 2, iRnn.end());
-      level_point->iR_ = (1 - options_->reg_weight_) * level_point->idepth_new_ + options_->reg_weight_ * iRnn[iRnn.size() / 2];
-      return;
-    }
-
-    level_point->iR_ = level_point->idepth_new_;
-  }
+  void UpdateIR(const int &idx, const int &level, const std::vector<bool> &make_sense);
 
   /**
    * @brief 将上层点投影到下层来
@@ -251,51 +230,7 @@ public:
    * 2. 将被判断为是内点，且参与过优化的逆深度投影进行投影继承
    * 3. 只有当snap为true时，PropagateDown才有意义
    */
-  void PropagateDown(const int &nlevel)
-  {
-    if (nlevel < 1)
-      throw std::runtime_error("nlevel error");
-
-    auto parent_pixel_points = init_idepth_points_[nlevel];
-    auto children_pixel_points = init_idepth_points_[nlevel - 1];
-
-    std::vector<bool> make_sense(children_pixel_points.size(), false);
-    std::vector<int> indices(children_pixel_points.size(), 0);
-    std::iota(indices.begin(), indices.end(), 0);
-
-    // 父点向子点投影过程
-    auto child_point_process = [&](const int &idx)
-    {
-      // 继承状态信息
-      auto &child_point = children_pixel_points[idx];
-      auto &parent_point = parent_pixel_points[child_point->parent_id_];
-
-      // 认为在优化最后被判断为内点
-      if (!parent_point->is_good_)
-        return;
-
-      // 继承逆深度信息，更相信自己一点
-      child_point->idepth_new_ =
-          2 * child_point->only_photo_hessian_new_ * child_point->idepth_new_ + parent_point->only_photo_hessian_new_ * parent_point->idepth_new_;
-      float new_hessian = 2 * child_point->only_photo_hessian_new_ + parent_point->only_photo_hessian_new_;
-      child_point->idepth_new_ /= (new_hessian + 1e-8);
-      make_sense[idx] = true;
-
-      assert(new_hessian != 0);
-    };
-
-    // 当前层点的ir处理
-    auto update_ir_process = [&](const int &idx)
-    {
-      auto &child_point = children_pixel_points[idx];
-      if (make_sense[idx])
-        UpdateIR(idx, nlevel - 1, make_sense);
-    };
-
-    // 这时仅仅使用parent 的内容，而不是修改，因此不存在数据竞争
-    std::for_each(std::execution::par, indices.begin(), indices.end(), child_point_process);
-    std::for_each(std::execution::par, indices.begin(), indices.end(), update_ir_process);
-  }
+  void PropagateDown(const int &nlevel);
 
   /**
    * @brief 当优化完成后，使用下层点投影到上层点 nlevel -> nlevel + 1
@@ -305,100 +240,7 @@ public:
    * 3. 当子点被判断为make_sense的时，父点会被判断为make_sense
    * 4. 注意，需要在投影到上一层后，进行IR更新
    */
-  void PropagateUp()
-  {
-    auto pixel_points_curr = init_idepth_points_[0];
-    std::vector<InitIdepthPoint::SharedPtr> pixel_points_prev;
-
-    std::vector<bool> make_sense_curr(pixel_points_curr.size(), false); // 当前层的逆深度是否make sense
-    std::vector<bool> make_sense_prev;                                  // 上一层的逆深度是否make sense
-
-    std::vector<float> idepth_with_hessian;
-    std::vector<float> idepth_hessian;
-    std::vector<int> sense_child_nums;
-
-    int nlevel = 0;
-
-    // 使用第0层的优化状态点，初始化make_sense_curr
-    auto pixel_points_layer0_process = [&](const int &idx)
-    {
-      if (!pixel_points_curr[idx]->is_good_)
-        return;
-
-      make_sense_curr[idx] = true;
-      assert(pixel_points_curr[idx]->only_photo_hessian_new_ != 0);
-    };
-
-    // 计算 idepth_with_hessian idepth_hessian make_sense_prev
-    auto compute_idepth_and_hessian_process = [&](const int &idx)
-    {
-      const auto &parent_point = pixel_points_prev[idx];
-      for (const int &child_idx : parent_point->children_ids_)
-      {
-        if (!make_sense_curr[child_idx])
-          continue;
-
-        ++sense_child_nums[idx];
-        idepth_hessian[idx] += pixel_points_curr[child_idx]->only_photo_hessian_new_;
-        idepth_with_hessian[idx] += pixel_points_curr[child_idx]->idepth_new_ * pixel_points_curr[child_idx]->only_photo_hessian_new_;
-      }
-
-      if (sense_child_nums[idx])
-        make_sense_prev[idx] = true;
-    };
-
-    // 使用 idepth_with_hessian idepth_hessian make_sense_prev 设置 parent 的 idepth 和 hessian
-    auto set_parent_idepth_process = [&](const int &idx)
-    {
-      if (!make_sense_prev[idx])
-        return;
-
-      auto &parent_point = pixel_points_prev[idx];
-      auto this_idepth_with_hessian = idepth_with_hessian[idx];
-      auto this_idepth_hessian = idepth_hessian[idx];
-
-      // 由于向上投影时，是否make_sense仅考虑下层是否make_sense, 避免出现hessian为0,这里造一个hessian出来
-      parent_point->idepth_new_ = this_idepth_with_hessian / (this_idepth_hessian + 1e-8);
-      if (!parent_point->only_photo_hessian_new_)
-        parent_point->only_photo_hessian_new_ = this_idepth_hessian / sense_child_nums[idx];
-
-      assert(this_idepth_hessian != 0);
-    };
-
-    // 上一层点的ir处理
-    auto update_ir_process = [&](const int &idx)
-    {
-      auto &parent_point = pixel_points_prev[idx];
-      if (make_sense_prev[idx])
-        UpdateIR(idx, nlevel + 1, make_sense_prev);
-    };
-
-    std::vector<int> indices_curr(pixel_points_curr.size(), 0);
-    std::vector<int> indices_prev;
-    std::iota(indices_curr.begin(), indices_curr.end(), 0);
-    std::for_each(std::execution::par, indices_curr.begin(), indices_curr.end(), pixel_points_layer0_process);
-
-    for (; nlevel < options_->pyra_levels_ - 1; ++nlevel)
-    {
-      pixel_points_prev = init_idepth_points_[nlevel + 1];
-
-      make_sense_prev = std::vector<bool>(pixel_points_prev.size(), false);
-      idepth_with_hessian = std::vector<float>(pixel_points_prev.size(), 0);
-      idepth_hessian = std::vector<float>(pixel_points_prev.size(), 0);
-      sense_child_nums = std::vector<int>(pixel_points_prev.size(), 0);
-
-      indices_prev = std::vector<int>(pixel_points_prev.size(), 0);
-      std::iota(indices_prev.begin(), indices_prev.end(), 0);
-
-      std::for_each(indices_prev.begin(), indices_prev.end(), compute_idepth_and_hessian_process);
-      std::for_each(indices_prev.begin(), indices_prev.end(), set_parent_idepth_process);
-      std::for_each(indices_prev.begin(), indices_prev.end(), update_ir_process);
-
-      std::swap(pixel_points_curr, pixel_points_prev);
-      std::swap(make_sense_curr, make_sense_prev);
-      std::swap(indices_prev, indices_curr);
-    }
-  }
+  void PropagateUp();
 
   /**
    * @brief 跟踪激活帧
@@ -492,12 +334,14 @@ public:
    *
    * @param level       当前层级
    * @param prev_kdtree 上一层级的kdtree
-   * @param curr_kdtree 当前层级的kdtree
+   * @param curr_cloud  当前层级的kdtree
    */
   void BuildParentChildAss(const int &level, const KdTree2d::ConstPtr &prev_kdtree, const CloudT::ConstPtr &curr_cloud);
 
   /// 设置可视化器
   void SetVisualizer(VisualizerPtr visualizer);
+
+  ~Initializer2() = default;
 
 private:
   SE3f Tji_, Tji_new_;                  ///< 相对位姿变换
@@ -513,6 +357,9 @@ private:
   std::vector<float> init_fx_, init_fy_, init_cx_, init_cy_;                ///< 初始化过程中的相机内参
 
   VisualizerPtr visualizer_; ///< 可视化器，用于初始化器的可视化
+
+  KeyFrame::SharedPtr keyframe0_; ///< 初始化完成后，由参考帧构建的关键帧
+  KeyFrame::SharedPtr keyframe1_; ///< 初始化完成后，由最后一个跟踪帧构建的关键帧
 };
 
 } // namespace dso_ssl
