@@ -44,7 +44,7 @@ float BilinInterp(const cv::Mat &data, float u, float v)
 /**
  * @brief 对图像数据执行双线型差值，3 * 1，3通道
  *
- * @param data  输入的图像数据，要求为float类型
+ * @param data  输入的图像数据，要求为CV_32FC3类型
  * @param u     输入的x坐标
  * @param v     输入的y坐标
  * @return float 输出的差值结果

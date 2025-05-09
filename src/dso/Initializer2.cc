@@ -838,11 +838,15 @@ void Initializer2::PostProcess()
   }
 
   if (keyframe_points.size() != options_->require_points_num_)
-      std::cerr << "Post Process have not enough points" << std::endl;
+    std::cerr << "Post Process have not enough points" << std::endl;
 
   // 认定当前参考帧是世界坐标系
-  reference_frame_->SetEstimate(SE3f(), 0.0, 0.0);
-  current_frame_->SetEstimate(Tji_, aji_, bji_);
+  float exposure_ti = reference_frame_->GetExposureTime();
+  if (exposure_ti < 0)
+    exposure_ti = 1;
+
+  reference_frame_->SetEstimate(SE3f(), 0.f, 0.f, exposure_ti, 0.f, 0.f);
+  current_frame_->SetEstimate(Tji_, aji_, bji_, exposure_ti, 0, 0);
 
   keyframe0_ = std::make_shared<KeyFrame>(reference_frame_, keyframe_points);
   keyframe1_ = std::make_shared<KeyFrame>(current_frame_, std::vector<InitIdepthPoint::SharedPtr>());

@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 3.10)
 
 project(dso-ssl VERSION 1.0)
 
-if(NOT CMAKE_CXX_STANDARD)
+if (NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED True)
-endif()
+endif ()
 
 # set(CMAKE_BUILD_TYPE Release)
 
@@ -21,23 +21,24 @@ find_package(slam_viewer REQUIRED)
 find_package(g2o REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(tabulate REQUIRED)
+find_package(spdlog REQUIRED)
 
 set(BUILD_TESTS ON)
 
-if(BUILD_TESTS)
+if (BUILD_TESTS)
     add_subdirectory(${PROJECT_SOURCE_DIR}/tests)
-endif()
+endif ()
 
 # add dso_ssl library
 file(GLOB_RECURSE SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cc)
 add_library(dso-ssl SHARED ${SRC_FILES})
 target_link_libraries(dso-ssl PUBLIC ${OpenCV_LIBS} ${PCL_LIBRARIES} Eigen3::Eigen TBB::tbb
-                                     yaml-cpp tabulate::tabulate g2o::core g2o::solver_eigen g2o::solver_cholmod g2o::solver_csparse
-                                     slam_viewer::slam_viewer)
+        yaml-cpp tabulate::tabulate g2o::core g2o::solver_eigen g2o::solver_cholmod
+        slam_viewer::slam_viewer spdlog::spdlog_header_only)
 target_include_directories(
-    dso-ssl
-    PUBLIC ${OpenCV_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS}
-           $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-           $<INSTALL_INTERFACE:include>)
+        dso-ssl
+        PUBLIC ${OpenCV_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS}
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>)
 
 # message(STATUS ${SRC_FILES})

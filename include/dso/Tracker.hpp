@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <condition_variable>
 #include <memory>
 
@@ -29,6 +28,10 @@ public:
   using Vec3f = Eigen::Vector3f;
   using Vec2i = Eigen::Vector2i;
   using Vec2f = Eigen::Vector2f;
+  using Vec8d = Eigen::Vector<double, 8>;
+  using Vec8f = Eigen::Vector<float, 8>;
+  using Mat8d = Eigen::Matrix<double, 8, 8>;
+  using Mat8f = Eigen::Matrix<float, 8, 8>;
   using TrackerIdepthPoints = std::vector<std::vector<TrackIdpethPoint::SharedPtr>>;
 
   struct Options
@@ -37,7 +40,11 @@ public:
 
     Options(const std::string &filepath);
 
-    int pyra_levels_; ///< 使用的图像金字塔层数
+    int pyra_levels_;                 ///< 使用的图像金字塔层数
+    float huber_threshold_;           ///< 优化过程中规定的huber阈值
+    std::vector<int> max_iterations_; ///< 定义每层最大迭代次数
+    bool verbose_;                    ///< 定义是否verbose输出
+    float outlier_threshold_;         ///< 外点阈值
   };
 
   Tracker(Options::SharedPtr options)
@@ -50,6 +57,7 @@ public:
       , track_cx_(options_->pyra_levels_)
       , track_cy_(options_->pyra_levels_)
       , is_notified_(true)
+      , last_rmse_(options_->pyra_levels_, 0.f)
   {
   }
 
@@ -129,6 +137,56 @@ public:
    */
   void IdpethExpansion(const int &level, cv::Mat &input_idepth_sum, cv::Mat &input_hessian_sum);
 
+  void Pixel2pixel(const SE3f &Tji, const TrackIdpethPoint::SharedPtr &pi, const int &level, Vec3f &p_temp, Vec2f &pj);
+
+  void SetCurrFrame(Frame::SharedPtr frame) { curr_frame_ = std::move(frame); }
+
+  /**
+   * 计算jacobian和error误差，并构建正规方程，使用huber核函数
+   *
+   * 1. 获取level层的参考帧的逆深度点 lvl_pts
+   * 2. 将lvl_pts上的点pi投影到当前帧pj点上（投影过程+差值过程）
+   * 3. 使用Tji、ai、bi、aj、bj和上述得到的投影点和图像差值构建残差
+   * 4. 根据残差和options_中的huber_threshold_计算hw值
+   * 5. 计算雅可比矩阵
+   * 6. 根据hw、雅可比矩阵和残差构建正规方程
+   *
+   * @param level       输入的金字塔层级
+   * @param Tji         输入的参考帧到当前帧的变换
+   * @param ai          输入的参考帧的绝对仿射参数ai
+   * @param bi          输入的参考帧的绝对仿射参数bi
+   * @param aj          输入的当前帧的绝对仿射参数aj
+   * @param bj          输入的当前帧的绝对仿射参数bj
+   * @param H           输出的正规方程中的H矩阵
+   * @param b           输出的正规方程中的b向量
+   * @param adjust_flag 输出的是否调整了外点阈值
+   * @return Vec2f  [energy_photo, ngood]
+   */
+  Vec2f ComputeJacobianAndError(const int &level, const SE3f &Tji, const float &ai, const float &bi, const float &aj,
+                                const float &bj, Mat8f &H, Vec8f &b, bool &adjust_flag);
+
+  /**
+   * 根据Tji,尝试一次优化
+   *
+   * 1. 从粗到精遍历金字塔层级
+   * 2. 使用lm方法，进行优化
+   *
+   * 优化失败触发条件，可以做到提前退出
+   *  1. ComputeJacobianAndError函数中，内点数量始终不能大于0.6，则认定失败
+   *  2. 层级优化完成后，如果发现优化的RMSE结果，大于1.5倍的中断abort_res，则认定失败
+   *
+   * @param Tji_estimate  输入输出的Tji，参考帧和普通帧之间的位姿变换
+   * @param aj_estimate   输入输出的aj，当前帧的绝对仿射参数aj
+   * @param bj_estimate   输入输出的bj，当前帧的绝对仿射参数bj
+   * @param ai            输入的ai，参考帧绝对仿射参数
+   * @param bi            输入的bi，参考帧绝对仿射参数bj
+   * @param abort_res     输入的各层级中优化的RMSE中断阈值
+   * @return true         优化成功
+   * @return false        优化失败
+   */
+  bool TryOnce(SE3f &Tji_estimate, float &aj_estimate, float &bj_estimate, const float &ai, const float &bi,
+               const std::vector<float> &abort_res);
+
 private:
   Options::SharedPtr options_;              ///< 跟踪器的配置参数
   Frame::SharedPtr curr_frame_;             ///< 当前待跟踪帧
@@ -143,6 +201,8 @@ private:
   std::mutex tracker_mutex_;                 ///< 跟踪器互斥量
   std::condition_variable tracker_cond_var_; ///< 跟踪器条件变量
   bool is_notified_;                         ///< 是否执行了唤醒操作，防止虚假唤醒
+
+  std::vector<float> last_rmse_; ///< tracker最新的优化均方根误差
 };
 
 } // namespace dso_ssl

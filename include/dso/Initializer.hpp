@@ -5,10 +5,8 @@
 #include <g2o/core/block_solver.h>
 #include <g2o/core/hyper_graph_action.h>
 #include <g2o/core/optimization_algorithm_levenberg.h>
-#include <g2o/core/robust_kernel_impl.h>
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/solvers/cholmod/linear_solver_cholmod.h>
-#include <g2o/solvers/csparse/linear_solver_csparse.h>
 #include <g2o/solvers/eigen/linear_solver_eigen.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/point_cloud.h>
@@ -245,7 +243,7 @@ public:
   using SE3f = Sophus::SE3f;
   using Vector2f = Eigen::Vector2f;
   using BlockSolver = g2o::BlockSolverX;
-  using LinearSolver = g2o::LinearSolverCSparse<BlockSolver::PoseMatrixType>;
+  using LinearSolver = g2o::LinearSolverEigen<BlockSolver::PoseMatrixType>;
 
   struct OptimizeResultDetails
   {

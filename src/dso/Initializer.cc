@@ -1,7 +1,9 @@
 #include <execution>
 #include <filesystem>
 #include <mutex>
+
 #include <tabulate/table.hpp>
+#include "g2o/core/robust_kernel_impl.h"
 
 #include "dso/Initializer.hpp"
 

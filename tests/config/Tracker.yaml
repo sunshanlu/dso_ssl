@@ -1,1 +1,9 @@
 PyraidLevelsUsed: 4       # 使用的图像金字塔的层级
+HuberThreshold: 9
+MaxIterations:
+  - 10
+  - 20
+  - 50
+  - 50
+Verbose: True
+OutlierThreshold: 20
