@@ -55,8 +55,8 @@ void Frame::MakePyrdImages(const cv::Mat &first_layer_image)
  * @param timestamp                     获取图像数据的时间戳
  * @param exposure_time                 曝光时间
  */
-Frame::Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image,
-             const cv::Mat &only_pixel_undistorted_image, double timestamp, float exposure_time)
+Frame::Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image, double timestamp,
+             float exposure_time)
     : options_(config)
 {
   frame_kernel_ = std::make_shared<FrameKernel>(timestamp, exposure_time);

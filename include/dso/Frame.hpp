@@ -58,8 +58,8 @@ public:
     bool use_origin_grad_; ///< 梯度平方和是否使用原图的梯度
   };
 
-  Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image,
-        double timestamp, float exposure_time);
+  Frame(const Options::SharedPtr &config, const cv::Mat &first_layer_image, const cv::Mat &only_pixel_undistorted_image, double timestamp,
+        float exposure_time);
 
   Frame(Frame &&other) noexcept
   {
@@ -88,8 +88,7 @@ public:
    * @param ai  输入的i帧绝对仿射参数ai
    * @param bi  输入的i帧绝对仿射参数bi
    */
-  void SetEstimate(const Sophus::SE3f &Tcw, const float &acw, const float &bcw, const float &ti = 1,
-                   const float &ai = 0, const float &bi = 0)
+  void SetEstimate(const Sophus::SE3f &Tcw, const float &acw, const float &bcw, const float &ti = 1, const float &ai = 0, const float &bi = 0)
   {
     std::lock_guard<std::mutex> lock(status_mutex_);
     frame_kernel_->T_cw_ = Tcw;
@@ -110,6 +109,8 @@ public:
   const cv::Mat &GetSqureGrad() const { return squre_grad_; }
 
   const float &GetExposureTime() const { return frame_kernel_->exposure_time_; }
+
+  const double &GetTimestamp() const { return frame_kernel_->timestamp_; }
 
   const std::size_t &GetIdx() const { return frame_kernel_->id_; }
 

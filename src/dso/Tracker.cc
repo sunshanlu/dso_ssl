@@ -1,5 +1,4 @@
 #include "dso/Tracker.hpp"
-
 #include "dso/PhotoAffine.hpp"
 #include "utils/Project.hpp"
 
@@ -7,7 +6,7 @@ namespace dso_ssl
 {
 
 /**
- * @brief 将滑动窗口中的关键帧向最新关键帧进行投影
+ * @brief 将滑动窗口中的关键帧向最新关键帧进行投影，后端线程调用
  *
  * 1. 要求关键帧的逆深度点状态里面没有外点
  * 2. 使用的逆深度点时、Tcw等滑动窗口状态时，不能在逆深度更新过程中
@@ -17,8 +16,7 @@ namespace dso_ssl
  * @param ref_idepth_sum          输出的逆深度点高斯归一化积的分布情况，第0层
  * @param ref_hessian_sum         输出的逆深度点hessian的分布情况，第0层
  */
-void Tracker::ProjectWindow2Ref(const std::vector<KeyFrame::SharedPtr> &sliding_window, cv::Mat &ref_idepth_sum,
-                                cv::Mat &ref_hessian_sum)
+void Tracker::ProjectWindow2Ref(const std::vector<KeyFrame::SharedPtr> &sliding_window, cv::Mat &ref_idepth_sum, cv::Mat &ref_hessian_sum)
 {
   cv::Mat square_grad = ref_keyframe_->GetSqureGrad();
   cv::Mat track_idpeth_points(square_grad.rows, square_grad.cols, CV_32F, 0.f);
@@ -84,8 +82,7 @@ void Tracker::ProjectWindow2Ref(const std::vector<KeyFrame::SharedPtr> &sliding_
  * @param prev_idepth_sum   输出的上一层金字塔idepth_sum
  * @param prev_hessian_sum  输出的上一层金字塔hessian_sum
  */
-void Tracker::PropagateUp(const cv::Mat &curr_idepth_sum, const cv::Mat &curr_hessian_sum, cv::Mat &prev_idepth_sum,
-                          cv::Mat &prev_hessian_sum)
+void Tracker::PropagateUp(const cv::Mat &curr_idepth_sum, const cv::Mat &curr_hessian_sum, cv::Mat &prev_idepth_sum, cv::Mat &prev_hessian_sum)
 {
   if (curr_idepth_sum.rows % 2 != 0 || curr_idepth_sum.cols % 2 != 0)
     throw std::runtime_error("Tracker::PropagateUp: curr_idepth_sum must be even");
@@ -106,8 +103,8 @@ void Tracker::PropagateUp(const cv::Mat &curr_idepth_sum, const cv::Mat &curr_he
     prev_idepth_sum.at<float>(row, col) += (idepth_sum0 + idepth_sum1 + idepth_sum2 + idepth_sum3);
 
     // 验证向上投影过程中是否出现非法逆深度
-    assert(std::isfinite(idepth_sum0) && std::isfinite(idepth_sum1) && std::isfinite(idepth_sum2) &&
-           std::isfinite(idepth_sum3) && idepth_sum0 >= 0 && idepth_sum1 >= 0 && idepth_sum2 >= 0 && idepth_sum3 >= 0);
+    assert(std::isfinite(idepth_sum0) && std::isfinite(idepth_sum1) && std::isfinite(idepth_sum2) && std::isfinite(idepth_sum3) && idepth_sum0 >= 0 &&
+           idepth_sum1 >= 0 && idepth_sum2 >= 0 && idepth_sum3 >= 0);
 
     float hessian_sum0 = curr_hessian_sum.at<float>(2 * row, 2 * col);
     float hessian_sum1 = curr_hessian_sum.at<float>(2 * row, 2 * col + 1);
@@ -116,9 +113,8 @@ void Tracker::PropagateUp(const cv::Mat &curr_idepth_sum, const cv::Mat &curr_he
     prev_hessian_sum.at<float>(row, col) += (hessian_sum0 + hessian_sum1 + hessian_sum2 + hessian_sum3);
 
     // 验证向上投影过程中是否出现非法hessian
-    assert(std::isfinite(hessian_sum0) && std::isfinite(hessian_sum1) && std::isfinite(hessian_sum2) &&
-           std::isfinite(hessian_sum3) && hessian_sum0 >= 0 && idepth_sum1 >= 0 && idepth_sum2 >= 0 &&
-           idepth_sum3 >= 0);
+    assert(std::isfinite(hessian_sum0) && std::isfinite(hessian_sum1) && std::isfinite(hessian_sum2) && std::isfinite(hessian_sum3) &&
+           hessian_sum0 >= 0 && idepth_sum1 >= 0 && idepth_sum2 >= 0 && idepth_sum3 >= 0);
   };
 
   std::vector<int> indices(prev_rows * prev_cols);
@@ -197,7 +193,7 @@ void Tracker::IdpethExpansion(const int &level, cv::Mat &input_idepth_sum, cv::M
 }
 
 /**
- * @brief 构建参考点，将构造的参考点放到 track_idepth_points中
+ * @brief 构建参考点，将构造的参考点放到 track_idepth_points中，后端线程调用
  *
  * 1. 将滑动窗口中的关键帧逆深度点，投影到最新的关键帧上，得到第0层逆深度点分布状态
  *  1.1 投影过程需要考虑四舍五入，因此存在多个投影点对应一个投影点的情况，使用高斯归一化积
@@ -268,26 +264,26 @@ void Tracker::BuildTrackerPoints(const std::vector<KeyFrame::SharedPtr> &sliding
  * 1. 更新参考关键帧、滑动窗口状态等信息
  * 2. 更新相机的内参矩阵
  *
+ * @note 由于需要修改Tracker线程中的状态，因此需要先加锁来保证线程安全
+ *
  * @param sliding_window 输入的滑动窗口，用于向最新关键帧投影
  * @param fx             后端优化后的fx
  * @param fy             后端优化后的fy
  * @param cx             后端优化后的cx
  * @param cy             后端优化后的cy
  */
-void Tracker::UpdateTracker(const std::vector<KeyFrame::SharedPtr> &sliding_window, const float &fx, const float &fy,
-                            const float &cx, const float &cy)
+void Tracker::UpdateTracker(const std::vector<KeyFrame::SharedPtr> &sliding_window, const float &fx, const float &fy, const float &cx,
+                            const float &cy)
 {
-  std::unique_lock<std::mutex> lock;
+  mapper_changed_.store(true);
+  std::lock_guard<std::mutex> lock(tracker_mutex_);
 
-  // 条件变量在谓词lambda执行过程中，已经拿到了lock的所有权
-  tracker_cond_var_.wait(lock, [&]() { return is_notified_; });
   UpdateCalib(fx, fy, cx, cy);
   BuildTrackerPoints(sliding_window);
-  is_notified_ = false;
 }
 
 /**
- * @brief 更新Tracker跟踪器的内参矩阵
+ * @brief 更新Tracker跟踪器的内参矩阵，后端线程调用
  *
  * @param fx 输入的后端更新后的fx
  * @param fy 输入的后端更新后的fy
@@ -311,11 +307,10 @@ void Tracker::UpdateCalib(const float &fx, const float &fy, const float &cx, con
 }
 
 
-void Tracker::Pixel2pixel(const SE3f &Tji, const TrackIdpethPoint::SharedPtr &pi, const int &level, Vec3f &p_temp,
-                          Vec2f &pj)
+void Tracker::Pixel2pixel(const SE3f &Tji, const TrackIdpethPoint::SharedPtr &pi, const int &level, Vec3f &p_temp, Vec2f &pj)
 {
-  project::Pixel2Pixel(Tji, pi->ref_pixel_point_, pi->ref_idepth_, track_fx_[level], track_fy_[level], track_cx_[level],
-                       track_cy_[level], p_temp, pj);
+  project::Pixel2Pixel(Tji, pi->ref_pixel_point_, pi->ref_idepth_, track_fx_self_[level], track_fy_self_[level], track_cx_self_[level],
+                       track_cy_self_[level], p_temp, pj);
 }
 
 
@@ -339,14 +334,14 @@ void Tracker::Pixel2pixel(const SE3f &Tji, const TrackIdpethPoint::SharedPtr &pi
  * @param adjust_flag 输出的是否调整了外点阈值
  * @return Vec2f  [energy_photo, ngood]
  */
-Tracker::Vec2f Tracker::ComputeJacobianAndError(const int &level, const SE3f &Tji, const float &ai, const float &bi,
-                                                const float &aj, const float &bj, Mat8f &H, Vec8f &b, bool &adjust_flag)
+Tracker::Vec2f Tracker::ComputeJacobianAndError(const int &level, const SE3f &Tji, const float &ai, const float &bi, const float &aj, const float &bj,
+                                                Mat8f &H, Vec8f &b, bool &adjust_flag)
 {
   double energy_photo = 0;
   Mat8d H_d = Mat8d::Zero();
   Vec8d b_d = Vec8d::Zero();
 
-  float exposure_ti = ref_keyframe_->GetExposureTime();
+  float exposure_ti = ref_frame_state_.ti;
   float exposure_tj = curr_frame_->GetExposureTime();
   if (exposure_ti < 0 || exposure_tj < 0)
   {
@@ -354,8 +349,8 @@ Tracker::Vec2f Tracker::ComputeJacobianAndError(const int &level, const SE3f &Tj
     exposure_tj = 1.f;
   }
 
-  const float &lfx = track_fx_[level], &lfy = track_fy_[level];
-  const float &lcx = track_cx_[level], &lcy = track_cy_[level];
+  const float &lfx = track_fx_self_[level], &lfy = track_fy_self_[level];
+  const float &lcx = track_cx_self_[level], &lcy = track_cy_self_[level];
   float exp_aji = exposure_tj * std::exp(ai) / (exposure_ti * std::exp(aj));
   float bji = bj - exp_aji * bi;
 
@@ -365,12 +360,12 @@ Tracker::Vec2f Tracker::ComputeJacobianAndError(const int &level, const SE3f &Tj
   Mat3f RKi = Tji.rotationMatrix() * Ki;
   Vec3f tji = Tji.translation();
 
-  cv::Mat ref_image_and_grad = ref_keyframe_->GetPyrdImageAndGrads()[level];
+  cv::Mat ref_image_and_grad = ref_keyframe_self_->GetPyrdImageAndGrads()[level];
   cv::Mat cur_image_and_grad = curr_frame_->GetPyrdImageAndGrads()[level];
 
   // 1. 获取level层的参考帧的逆深度点 lvl_pts
   int ngood = 0;
-  auto &lvl_pts = track_idepth_points_[level];
+  auto &lvl_pts = track_idepth_points_self_[level];
 
   std::vector<Vec3f, Eigen::aligned_allocator<Vec3f>> Ij_and_grad_buf(lvl_pts.size(), Vec3f::Zero());
   std::vector<float> idepth_pj_buf(lvl_pts.size(), 0);
@@ -585,15 +580,13 @@ bool Tracker::TryOnce(SE3f &Tji_estimate, float &aj_estimate, float &bj_estimate
       if (options_->verbose_)
       {
         if (!accept)
-          std::cout << "level: " << level << "\titeration: " << iteration
-                    << "\tsqrt(energy / nums): " << std::sqrt(res_old[0] / res_old[1]) << "->"
-                    << std::sqrt(res_new[0] / res_new[1]) << "\tinlier num: " << static_cast<int>(res_old[1]) << "->"
-                    << static_cast<int>(res_new[1]) << "\tReject" << std::endl;
+          std::cout << "level: " << level << "\titeration: " << iteration << "\tsqrt(energy / nums): " << std::sqrt(res_old[0] / res_old[1]) << "->"
+                    << std::sqrt(res_new[0] / res_new[1]) << "\tinlier num: " << static_cast<int>(res_old[1]) << "->" << static_cast<int>(res_new[1])
+                    << "\tReject" << std::endl;
         else
-          std::cout << "level: " << level << "\titeration: " << iteration
-                    << "\tsqrt(energy / nums): " << std::sqrt(res_new[0] / res_new[1]) << "->"
-                    << std::sqrt(res_old[0] / res_old[1]) << "\tinlier num: " << static_cast<int>(res_new[1]) << "->"
-                    << static_cast<int>(res_old[1]) << "\tAccept" << std::endl;
+          std::cout << "level: " << level << "\titeration: " << iteration << "\tsqrt(energy / nums): " << std::sqrt(res_new[0] / res_new[1]) << "->"
+                    << std::sqrt(res_old[0] / res_old[1]) << "\tinlier num: " << static_cast<int>(res_new[1]) << "->" << static_cast<int>(res_old[1])
+                    << "\tAccept" << std::endl;
       }
       if (inc.norm() < eps || fails_times >= max_fails_times)
         break;
@@ -618,6 +611,334 @@ bool Tracker::TryOnce(SE3f &Tji_estimate, float &aj_estimate, float &bj_estimate
 }
 
 /**
+ * 从后端线程中同步数据，然后才能开始跟踪
+ *
+ * 1. 同步参考帧状态
+ *  1.1 同步参考帧指针到ref_keyframe_self_中，保证能够获取最新的位姿状态
+ *  1.2 同步参考帧状态到ref_frame_state_中，与后端产生数据分离，保证线程安全
+ *  1.3 同步上一帧参考关键帧的位姿，与后端产生数据分离
+ * 2. 同步逆深度点指针，与后端线程保证数据隔离
+ * 3. 同步相机内参，与后端线程保证数据隔离
+ */
+void Tracker::SyncFromLocalMapper()
+{
+  if (!mapper_changed_)
+    return;
+
+  {
+    std::lock_guard<std::mutex> lock(tracker_mutex_);
+    ref_keyframe_self_ = ref_keyframe_;
+    ref_frame_state_.ti = ref_keyframe_->GetExposureTime();
+    ref_keyframe_->GetFrameStatus(ref_frame_state_.Trw_, ref_frame_state_.ai, ref_frame_state_.bi);
+
+    if (last_ref_keyframe_)
+    {
+      last_ref_frame_state_.ti = last_ref_keyframe_->GetExposureTime();
+      last_ref_keyframe_->GetFrameStatus(last_ref_frame_state_.Trw_, last_ref_frame_state_.ai, last_ref_frame_state_.bi);
+    }
+
+    track_idepth_points_self_ = track_idepth_points_;
+    track_fx_self_ = track_fx_;
+    track_fy_self_ = track_fy_;
+    track_cx_self_ = track_cx_;
+    track_cy_self_ = track_cy_;
+  }
+  mapper_changed_.store(false);
+  refframe_changed_ = true;
+}
+
+/**
+ * 根据Tracker跟踪器的状态，跟踪当前帧
+ *
+ * 1. 有 last frame 的跟踪尝试
+ * 2. 没有 last frame 的跟踪尝试
+ *
+ * @param frame   输入的待跟踪的帧
+ * @return true   跟踪成功
+ * @return false  跟踪失败
+ */
+bool Tracker::TrackActivateFrame(Frame::SharedPtr frame)
+{
+  curr_frame_ = std::move(frame);
+  if (!last_ref_keyframe_)
+    return TrackFrameWithoutLast();
+
+  return TrackFrameWithLast();
+}
+
+
+/**
+ * 对于没有上一帧条件下的跟踪frame
+ *
+ * 1. 做线程同步，保证线程安全，取后端线程更新数据，做数据隔离和数据关联
+ * 2. 仅使用相对参考关键帧静止策略进行跟踪尝试
+ * 3. 对 velocity 等参数进行初始化
+ *
+ * @return true   跟踪成功
+ * @return false  跟踪失败
+ */
+bool Tracker::TrackFrameWithoutLast()
+{
+  SyncFromLocalMapper();
+
+  SE3f Tji_estimate;
+  float aj = 0, bj = 0;
+
+  // 若参考关键帧发生改变，则abort_rmse_则没有效力，重置为max float
+  if (refframe_changed_)
+    abort_rmse_ = std::vector<float>(options_->pyra_levels_, std::numeric_limits<float>::max());
+
+  bool track_ret = TryOnce(Tji_estimate, aj, bj, ref_frame_state_.ai, ref_frame_state_.bi, abort_rmse_);
+  if (!track_ret)
+    return false;
+
+  for (int level = 0; level < options_->pyra_levels_; ++level)
+  {
+    // 若refframe_changed_ == false，abort_rmse_继续进行更新
+    if (!refframe_changed_ && abort_rmse_[level] > last_rmse_[level])
+      abort_rmse_[level] = last_rmse_[level];
+  }
+
+  if (refframe_changed_)
+  {
+    abort_rmse_ = last_rmse_;
+    first_ref_rmse_ = last_rmse_;
+  }
+
+  SE3f Tcw = Tji_estimate * ref_frame_state_.Trw_;
+  curr_frame_->SetEstimate(Tcw, aj, bj);
+
+  Tlr_ = Tji_estimate;
+  last_ref_keyframe_ = ref_keyframe_self_;
+  last_ref_frame_state_ = ref_frame_state_;
+  velocity_ = Tji_estimate;
+
+  return true;
+}
+
+/**
+ * 根据Tracker跟踪器的状态，跟踪当前帧
+ *
+ * 1. 做线程同步，保证线程安全，取后端线程更新数据，做数据隔离和数据关联
+ * 2. 尝试不同的优化假设初值，进行TryOnce，实现提前退出
+ * 3. 对 velocity 等参数进行初始化
+ *
+ * @return true   跟踪成功
+ * @return false  跟踪失败
+ */
+bool Tracker::TrackFrameWithLast()
+{
+  SyncFromLocalMapper();
+  SE3f Tji_estimate;
+  float aj = 0, bj = 0;
+
+  SE3f Tlw = Tlr_ * last_ref_frame_state_.Trw_;
+  velocity_tries_[0] = velocity_.log();                               ///< 恒速运动模型
+  velocity_tries_[1] = velocity_tries_[0] * 2;                        ///< 倍速运动模型
+  velocity_tries_[2] = velocity_tries_[0] * 0.5;                      ///< 半速运动模型
+  velocity_tries_[4] = (ref_frame_state_.Trw_ * Tlw.inverse()).log(); ///< 相对参考帧静止
+
+  bool have_one_good = false;
+
+  if (refframe_changed_)
+    abort_rmse_ = std::vector<float>(options_->pyra_levels_, std::numeric_limits<float>::max());
+
+  for (const auto &velocity_try: velocity_tries_)
+  {
+    SE3f Tcw = SE3f::exp(velocity_try) * Tlw;
+    Tji_estimate = Tcw * ref_frame_state_.Trw_.inverse();
+
+    if (TryOnce(Tji_estimate, aj, bj, ref_frame_state_.ai, ref_frame_state_.bi, abort_rmse_))
+    {
+      have_one_good = true;
+      break;
+    }
+  }
+
+  if (!have_one_good)
+    return false;
+
+  for (int level = 0; level < options_->pyra_levels_ - 1; ++level)
+  {
+    if (!refframe_changed_ && abort_rmse_[level] > last_rmse_[level])
+      abort_rmse_[level] = last_rmse_[level];
+  }
+
+  if (refframe_changed_)
+  {
+    abort_rmse_ = last_rmse_;
+    first_ref_rmse_ = last_rmse_;
+  }
+
+  SE3f Tcw = Tji_estimate * ref_frame_state_.Trw_;
+  curr_frame_->SetEstimate(Tcw, aj, bj);
+
+  Tlr_ = Tji_estimate;
+  last_ref_keyframe_ = ref_keyframe_self_;
+  last_ref_frame_state_ = ref_frame_state_;
+  velocity_ = Tcw * Tlw.inverse();
+  return true;
+}
+
+/**
+ * 使用回溯算法，构建跟踪器的小转角尝试生成（不包含静止条件）
+ *
+ * @param try_out 输入的尝试向量
+ * @param idx     输入的更改索引idx
+ *
+ */
+void Tracker::GenerateTries(Vec3f &try_out, const int &idx)
+{
+  static std::vector<float> tries_item = {-0.03, 0, 0.03};
+  if (idx == 3)
+  {
+    if (!(!try_out[0] && !try_out[1] && !try_out[2]))
+    {
+      Vec6f try_out_6f = Vec6f::Zero();
+      try_out_6f.tail<3>() = try_out;
+      velocity_tries_.push_back(try_out_6f);
+    }
+    return;
+  }
+
+  for (const float &item: tries_item)
+  {
+    try_out[idx] = item;
+    GenerateTries(try_out, idx + 1);
+    try_out[idx] = NAN;
+  }
+}
+
+/**
+ * 判断当前跟踪帧是否是关键帧
+ *
+ * 1. 时间间隔考虑，当间隔超过规定的间隔时间阈值时，插入关键帧
+ * 2. 空间间隔考虑，使用[Rji,tji]、[Rji,-tji]、[I,tji]、[I,-tji]计算平均光流，与阈值进行判断
+ * 3. 从光度仿射参数考虑，当相对仿射参数exp_aji变化较大时，说明光照条件发生改变，要创建关键帧了
+ * 4. 从优化角度考虑，如果当前帧跟踪跟踪的能量值超过当前参考帧第一次跟踪的两倍，则创建关键帧
+ *
+ * @return true   创建关键帧
+ * @return false  不创建关键帧
+ */
+bool Tracker::IsNeedKeyFrame()
+{
+  // 1. 时间间隔
+  auto cur_stamp = curr_frame_->GetTimestamp();
+  auto ref_stamp = ref_keyframe_self_->GetTimestamp();
+  double time_interval = cur_stamp - ref_stamp;
+  if (options_->time_interval_ > 0 && time_interval > options_->time_interval_)
+  {
+    logger_->debug("时间间隔超过阈值，创建关键帧");
+    return true;
+  }
+
+  // 2. 空间间隔，每隔32个点计算一次光流，最后求平均
+  int rows = ref_keyframe_self_->GetSqureGrad().rows;
+  int cols = ref_keyframe_self_->GetSqureGrad().cols;
+
+  SE3f Tji = curr_frame_->GetTcw() * ref_frame_state_.Trw_.inverse();
+  Mat3f Rji = Tji.rotationMatrix();
+  Vec3f tji = Tji.translation();
+
+  Mat3f Ki = Mat3f::Zero(), K = Mat3f::Zero();
+  Ki << 1.0 / track_fx_[0], 0, -track_cx_[0] / track_fx_[0], 0, 1.0 / track_fy_[0], -track_cy_[0] / track_fy_[0], 0, 0, 1;
+  K << track_fx_[0], 0, track_cx_[0], 0, track_fy_[0], track_cy_[0], 0, 0, 1;
+
+  Mat3f KRKi = K * Rji * Ki;
+  Vec3f Kt = K * tji;
+
+  std::vector<TrackIdpethPoint::SharedPtr> positions;
+  const auto &points_i = track_idepth_points_self_[0];
+  for (int idx = 0; idx < points_i.size(); idx += 32)
+    positions.push_back(points_i[idx]);
+
+  std::vector<float> tji_flow(positions.size(), 0);
+  std::vector<float> Tji_flow(positions.size(), 0);
+  std::vector<int> indices(positions.size());
+  std::iota(indices.begin(), indices.end(), 0);
+
+  auto position_process = [&](const int &idx)
+  {
+    const TrackIdpethPoint::SharedPtr &pi = positions[idx];
+    Vec3f position_pi(pi->ref_pixel_point_[0], pi->ref_pixel_point_[1], 1);
+    float u = position_pi[0], v = position_pi[1];
+
+    // 2.1 positive tji
+    Vec3f p_tji_pos = K * Ki * position_pi + Kt * pi->ref_idepth_;
+    float u_tji_pos = p_tji_pos[0] / p_tji_pos[2];
+    float v_tji_pos = p_tji_pos[1] / p_tji_pos[2];
+
+    // 2.2 negative tji
+    Vec3f p_tji_neg = K * Ki * position_pi - Kt * pi->ref_idepth_;
+    float u_tji_neg = p_tji_neg[0] / p_tji_neg[2];
+    float v_tji_neg = p_tji_neg[1] / p_tji_neg[2];
+
+    // 2.3 positive Tji
+    Vec3f p_Tji_pos = KRKi * position_pi + Kt * pi->ref_idepth_;
+    float u_Tji_pos = p_Tji_pos[0] / p_Tji_pos[2];
+    float v_Tji_pos = p_Tji_pos[1] / p_Tji_pos[2];
+
+    // 2.4 negative Tji
+    Vec3f p_Tji_neg = KRKi * position_pi - Kt * pi->ref_idepth_;
+    float u_Tji_neg = p_Tji_neg[0] / p_Tji_neg[2];
+    float v_Tji_neg = p_Tji_neg[1] / p_Tji_neg[2];
+
+    tji_flow[idx] += (u_tji_pos - u) * (u_tji_pos - u) + (v_tji_pos - v) * (v_tji_pos - v);
+    tji_flow[idx] += (u_tji_neg - u) * (u_tji_neg - u) + (v_tji_neg - v) * (v_tji_neg - v);
+    Tji_flow[idx] += (u_Tji_pos - u) * (u_Tji_pos - u) + (v_Tji_pos - v) * (v_Tji_pos - v);
+    Tji_flow[idx] += (u_Tji_neg - u) * (u_Tji_neg - u) + (v_Tji_neg - v) * (v_Tji_neg - v);
+  };
+
+  std::for_each(std::execution::par_unseq, indices.begin(), indices.end(), position_process);
+  float tji_flow_sum = std::sqrt(std::accumulate(tji_flow.begin(), tji_flow.end(), 0.f) / (2 * indices.size()));
+  float Tji_flow_sum = std::sqrt(std::accumulate(Tji_flow.begin(), Tji_flow.end(), 0.f) / (2 * indices.size()));
+  float tji_weight = tji_flow_sum * options_->shift_weight_t_ / (rows + cols);
+  float Tji_weight = Tji_flow_sum * options_->shift_weight_rt_ / (rows + cols);
+  if (tji_weight + Tji_weight > options_->shift_treshold_)
+  {
+    logger_->debug("空间间隔超过阈值，创建关键帧");
+    return true;
+  }
+
+  // 3. 光度仿射参数
+  SE3f _;
+  float aj, bj;
+  curr_frame_->GetFrameStatus(_, aj, bj);
+
+  float tj = curr_frame_->GetExposureTime();
+  float ti = ref_frame_state_.ti;
+  if (tj <= 0 || ti <= 0)
+  {
+    tj = 1;
+    ti = 1;
+  }
+
+  Vec2f ab_ji = PhotoAffine::GetRelative(ref_frame_state_.ai, aj, ref_frame_state_.bi, bj, ti, tj);
+  const float &exp_aji = ab_ji[0];
+  if (exp_aji > options_->max_exp_aji_threshold_ || exp_aji < options_->min_exp_aji_threshold_)
+  {
+    logger_->debug("光度仿射参数超过优化阈值，创建关键帧");
+    return true;
+  }
+
+  // 4. 从优化角度考虑
+  if (refframe_changed_)
+  {
+    refframe_changed_ = false;
+    return false;
+  }
+
+  if (first_ref_rmse_[0] * options_->rmse_threshold_factor_ < last_rmse_[0])
+  {
+    logger_->debug("超过优化阈值，创建关键帧");
+    return true;
+  }
+
+  return false;
+}
+
+
+/**
  * @brief 构造跟踪器配置文件
  *
  * @param filepath 输入的跟踪器配置文件路径
@@ -633,6 +954,13 @@ Tracker::Options::Options(const std::string &filepath)
   max_iterations_ = info["MaxIterations"].as<std::vector<int>>();
   verbose_ = info["Verbose"].as<bool>();
   outlier_threshold_ = info["OutlierThreshold"].as<float>();
+  time_interval_ = info["TimeInterval"].as<float>();
+  shift_weight_t_ = info["ShiftWeightT"].as<float>();
+  shift_weight_rt_ = info["ShiftWeightRT"].as<float>();
+  shift_treshold_ = info["ShiftTreshold"].as<float>();
+  max_exp_aji_threshold_ = info["MaxExpAjiThreshold"].as<float>();
+  min_exp_aji_threshold_ = info["MinExpAjiThreshold"].as<float>();
+  rmse_threshold_factor_ = info["RmseThresholdFactor"].as<float>();
 }
 
 

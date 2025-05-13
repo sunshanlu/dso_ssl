@@ -2,7 +2,6 @@ add_executable(TestPixelUndistorter TestPixelUndistorter.cc)
 target_link_libraries(TestPixelUndistorter dso-ssl)
 target_include_directories(TestPixelUndistorter PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
-
 add_executable(TestPhotoUndistorter TestPhotoUndistorter.cc)
 target_link_libraries(TestPhotoUndistorter dso-ssl)
 target_include_directories(TestPhotoUndistorter PRIVATE ${PROJECT_SOURCE_DIR}/include)

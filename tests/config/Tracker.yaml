@@ -1,9 +1,16 @@
 PyraidLevelsUsed: 4       # 使用的图像金字塔的层级
-HuberThreshold: 9
-MaxIterations:
+HuberThreshold: 9         # 使用的huber核函数阈值
+MaxIterations: # 最大迭代次数（金字塔）
   - 10
   - 20
   - 50
   - 50
-Verbose: True
-OutlierThreshold: 20
+Verbose: True             # 是否输出优化调试信息
+OutlierThreshold: 20      # 外点阈值，超过它就会被认定为外点
+TimeInterval: 1           # 关键帧创建的时间间隔阈值
+ShiftWeightT: 45          # 关键帧创建的空间阈值（仅t阈值，positive,negayive）
+ShiftWeightRT: 23         # 关键帧创建的空间阈值（T阈值，positive,negative）
+ShiftTreshold: 1          # 空间阈值比例
+MaxExpAjiThreshold: 1.5   # 相对仿射参数exp_aji最大阈值
+MinExpAjiThreshold: 0.7   # 相对仿射参数exp_aji最小阈值
+RmseThresholdFactor: 1.4  # 优化的rmse阈值，是否创建关键帧
